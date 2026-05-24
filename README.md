@@ -2,6 +2,8 @@
 
 Native Android MVP for Amply, an offline-first local music player with background playback, smart playlists, cached lyrics, genre enrichment, and a dark graphite UI with orange accents.
 
+For a deeper developer-oriented walkthrough of the architecture, data flow, and key files, see [README_DEVELOPER.md](README_DEVELOPER.md).
+
 ## Build
 
 Install Android Studio with:

@@ -24,11 +24,15 @@ val AmplyText = Color(0xFFF8F5EF)
 val AmplyMuted = Color(0xFFA7A2AF)
 
 val ZtNature = FontFamily(
-    Font(R.font.zt_nature_thin, FontWeight.Thin),
-    Font(R.font.zt_nature_regular, FontWeight.Normal),
-    Font(R.font.zt_nature_medium, FontWeight.Medium),
-    Font(R.font.zt_nature_bold, FontWeight.Bold),
-    Font(R.font.zt_nature_black, FontWeight.Black),
+    Font(R.font.gilroy_light, FontWeight.Light),
+    Font(R.font.gilroy_regular, FontWeight.Normal),
+    Font(R.font.gilroy_medium, FontWeight.Medium),
+    Font(R.font.gilroy_bold, FontWeight.Bold),
+    Font(R.font.gilroy_heavy, FontWeight.Black),
+)
+
+val AmplyBrand = FontFamily(
+    Font(R.font.octosale, FontWeight.Normal),
 )
 
 private val colorScheme: ColorScheme = darkColorScheme(
@@ -47,9 +51,9 @@ private val colorScheme: ColorScheme = darkColorScheme(
 
 private val typography = Typography().let { base ->
     Typography(
-        displayLarge = base.displayLarge.withFont(),
-        displayMedium = base.displayMedium.withFont(),
-        displaySmall = base.displaySmall.withFont(),
+        displayLarge = base.displayLarge.withBrandFont(),
+        displayMedium = base.displayMedium.withBrandFont(),
+        displaySmall = base.displaySmall.withBrandFont(),
         headlineLarge = base.headlineLarge.withFont(),
         headlineMedium = base.headlineMedium.withFont(),
         headlineSmall = base.headlineSmall.withFont(),
@@ -67,6 +71,9 @@ private val typography = Typography().let { base ->
 
 private fun TextStyle.withFont(weight: FontWeight? = null): TextStyle =
     copy(fontFamily = ZtNature, fontWeight = weight ?: fontWeight)
+
+private fun TextStyle.withBrandFont(): TextStyle =
+    copy(fontFamily = AmplyBrand, fontWeight = FontWeight.Normal)
 
 @Composable
 fun AmplyTheme(content: @Composable () -> Unit) {

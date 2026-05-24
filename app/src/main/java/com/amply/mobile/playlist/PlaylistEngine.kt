@@ -24,12 +24,32 @@ class PlaylistEngine {
         playlists += smart(
             id = "smart_daily_mix",
             name = "Daily Mix",
-            description = "A balanced local mix refreshed from your library.",
+            description = "Refreshed daily from favorites, repeats, and fresh discoveries.",
             songs = spreadByGenre(
                 weightedPick(songs, targetCount, seed, "daily") { song ->
-                    tasteScore(song, now, discovery, randomness) + if (song.favorite) 1.2f else 0f
+                    trendScore(song, now, discovery, randomness) + if (song.favorite) 1.2f else 0f
                 },
             ),
+        )
+
+        playlists += smart(
+            id = "smart_daily_discovery",
+            name = "Daily Discovery",
+            description = "A daily set that blends your trends with underplayed songs.",
+            songs = spreadByGenre(
+                weightedPick(songs, targetCount, seed, "daily-discovery") { song ->
+                    trendScore(song, now, discovery, randomness) + if (song.playCount <= 2) 2.2f else 0f
+                },
+            ),
+        )
+
+        playlists += smart(
+            id = "smart_today_vibe",
+            name = "Today's Vibe",
+            description = "A quick read of what your library says today.",
+            songs = weightedPick(songs, targetCount, seed, "today-vibe") { song ->
+                trendScore(song, now, discovery, randomness) + energyScore(song) * 0.45f
+            },
         )
 
         playlists += smart(
@@ -41,7 +61,7 @@ class PlaylistEngine {
                 targetCount,
                 seed,
                 "repeat",
-            ) { song -> song.playCount * 2f + recentBoost(song, now) },
+            ) { song -> song.playCount * 2f + recentBoost(song, now) - song.skipCount },
         )
 
         playlists += smart(
@@ -49,7 +69,7 @@ class PlaylistEngine {
             name = "Road Mix",
             description = "Upbeat tracks for drives and long walks.",
             songs = weightedPick(songs, targetCount, seed, "road") { song ->
-                tasteScore(song, now, discovery, randomness) + energyScore(song)
+                trendScore(song, now, discovery, randomness) + energyScore(song)
             },
         )
 
@@ -71,7 +91,9 @@ class PlaylistEngine {
             id = "smart_rediscover",
             name = "Rediscover",
             description = "Local tracks you have not played recently.",
-            songs = songs.sortedBy { it.lastPlayedAtSec ?: 0L }.take(targetCount),
+            songs = weightedPick(songs.sortedBy { it.lastPlayedAtSec ?: 0L }.take(targetCount * 2), targetCount, seed, "rediscover") {
+                (if (it.playCount <= 1) 1.5f else 0.5f) + if (!it.favorite) discovery else 0f
+            },
         )
 
         playlists += smart(
@@ -86,16 +108,72 @@ class PlaylistEngine {
             .filterKeys { it != "Unknown" }
             .entries
             .sortedByDescending { it.value.size + it.value.sumOf { song -> song.playCount } }
-            .take(6)
+            .take(12)
             .map { (genre, genreSongs) ->
                 smart(
                     id = "smart_genre_${genre.slug()}",
                     name = "$genre Mix",
                     description = "A mix based on your $genre tracks.",
-                    songs = weightedPick(genreSongs, targetCount, seed, "genre:$genre") { tasteScore(it, now, discovery, randomness) },
+                    songs = weightedPick(genreSongs, targetCount, seed, "genre:$genre") { trendScore(it, now, discovery, randomness) },
                 )
             }
         playlists += genreMixes
+
+        playlists += moodMix(
+            id = "smart_mood_happy",
+            name = "Happy Mix",
+            description = "Bright, upbeat local songs.",
+            songs = songs,
+            targetCount = targetCount,
+            seed = seed,
+            salt = "happy",
+            now = now,
+            score = { moodHappyScore(it) },
+        )
+        playlists += moodMix(
+            id = "smart_mood_sad",
+            name = "Sad Mix",
+            description = "Slower songs and softer late-night picks.",
+            songs = songs,
+            targetCount = targetCount,
+            seed = seed,
+            salt = "sad",
+            now = now,
+            score = { moodSadScore(it) },
+        )
+        playlists += moodMix(
+            id = "smart_mood_chill",
+            name = "Chill Mix",
+            description = "Low-pressure songs for background listening.",
+            songs = songs,
+            targetCount = targetCount,
+            seed = seed,
+            salt = "chill",
+            now = now,
+            score = { moodChillScore(it) },
+        )
+        playlists += moodMix(
+            id = "smart_mood_focus",
+            name = "Focus Mix",
+            description = "Longer, smoother songs with fewer skips.",
+            songs = songs,
+            targetCount = targetCount,
+            seed = seed,
+            salt = "focus",
+            now = now,
+            score = { moodFocusScore(it) },
+        )
+        playlists += moodMix(
+            id = "smart_mood_energy",
+            name = "Energy Mix",
+            description = "High-momentum songs for movement.",
+            songs = songs,
+            targetCount = targetCount,
+            seed = seed,
+            salt = "energy",
+            now = now,
+            score = { energyScore(it) },
+        )
 
         val artistMixes = songs
             .groupBy { primaryArtistName(it.artist) }
@@ -108,7 +186,7 @@ class PlaylistEngine {
                     id = "smart_artist_${artist.slug()}",
                     name = "$artist Radio",
                     description = "Songs from $artist in your library.",
-                    songs = shuffleStable(artistSongs, seed, "artist:$artist").take(targetCount),
+                    songs = weightedPick(artistSongs, targetCount, seed, "artist:$artist") { trendScore(it, now, discovery, randomness) },
                 )
             }
         playlists += artistMixes
@@ -136,6 +214,30 @@ class PlaylistEngine {
         return 1f + play + favorite + recentPenalty * 0.15f + explore - skipped
     }
 
+    private fun trendScore(song: Song, now: Long, discovery: Float, randomness: Float): Float =
+        tasteScore(song, now, discovery, randomness) +
+            recentBoost(song, now) * 0.35f +
+            if (song.totalPlayMs > 0L) (song.totalPlayMs / 180_000f).coerceIn(0f, 4f) else 0f
+
+    private fun moodMix(
+        id: String,
+        name: String,
+        description: String,
+        songs: List<Song>,
+        targetCount: Int,
+        seed: Long,
+        salt: String,
+        now: Long,
+        score: (Song) -> Float,
+    ): Playlist = smart(
+        id = id,
+        name = name,
+        description = description,
+        songs = weightedPick(songs, targetCount, seed, "mood:$salt") {
+            score(it) + tasteScore(it, now, discovery = 0.2f, randomness = 0.15f) * 0.5f
+        },
+    )
+
     private fun recentBoost(song: Song, now: Long): Float {
         val lastPlayed = song.lastPlayedAtSec ?: return 0f
         val days = abs(now - lastPlayed) / 86_400f
@@ -148,6 +250,43 @@ class PlaylistEngine {
         if (genre in setOf("pop", "hip-hop", "rap", "rock", "alternative", "electronic", "latin")) score += 2.5f
         if (song.durationMs in 120_000L..300_000L) score += 1f
         return score
+    }
+
+    private fun moodHappyScore(song: Song): Float {
+        val genre = normalizeGenreBucket(song.effectiveGenre).lowercase()
+        return when (genre) {
+            "pop", "latin", "electronic", "dance", "country" -> 3f
+            "hip-hop", "rap", "indie" -> 2f
+            else -> 0.8f
+        } + if (song.favorite) 0.9f else 0f
+    }
+
+    private fun moodSadScore(song: Song): Float {
+        val genre = normalizeGenreBucket(song.effectiveGenre).lowercase()
+        return when (genre) {
+            "r&b", "indie", "alternative", "classical", "jazz" -> 2.8f
+            "pop", "rock" -> 1.2f
+            else -> 0.7f
+        } + if (song.durationMs > 210_000L) 0.7f else 0f
+    }
+
+    private fun moodChillScore(song: Song): Float {
+        val genre = normalizeGenreBucket(song.effectiveGenre).lowercase()
+        return when (genre) {
+            "r&b", "jazz", "indie", "classical", "world" -> 3f
+            "alternative", "pop" -> 1.5f
+            else -> 0.6f
+        } - song.skipCount * 0.35f
+    }
+
+    private fun moodFocusScore(song: Song): Float {
+        val genre = normalizeGenreBucket(song.effectiveGenre).lowercase()
+        val genreScore = when (genre) {
+            "electronic", "classical", "jazz", "world" -> 2.4f
+            "indie", "alternative" -> 1.5f
+            else -> 0.6f
+        }
+        return genreScore + if (song.durationMs >= 180_000L) 0.9f else 0f - song.skipCount * 0.5f
     }
 
     private fun weightedPick(

@@ -1,13 +1,16 @@
 package com.amply.mobile.scan
 
+import android.Manifest
 import android.content.ContentUris
 import android.content.Context
+import android.content.pm.PackageManager
 import android.media.MediaMetadataRetriever
 import android.media.MediaScannerConnection
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
+import androidx.core.content.ContextCompat
 import androidx.documentfile.provider.DocumentFile
 import androidx.room.withTransaction
 import com.amply.mobile.data.local.AmplyDatabase
@@ -31,20 +34,20 @@ class MusicScanner(
         } else {
             MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
         }
-        val projection = arrayOf(
+        val projection = listOfNotNull(
             MediaStore.Audio.Media._ID,
             MediaStore.Audio.Media.DISPLAY_NAME,
             MediaStore.Audio.Media.TITLE,
             MediaStore.Audio.Media.ARTIST,
             MediaStore.Audio.Media.ALBUM,
             MediaStore.Audio.Media.ALBUM_ID,
-            MediaStore.Audio.Media.GENRE,
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) MediaStore.Audio.Media.GENRE else null,
             MediaStore.Audio.Media.DURATION,
             MediaStore.Audio.Media.TRACK,
             MediaStore.Audio.Media.YEAR,
             MediaStore.Audio.Media.DATE_ADDED,
             MediaStore.Audio.Media.DATE_MODIFIED,
-        )
+        ).toTypedArray()
         val selection = "${MediaStore.Audio.Media.IS_MUSIC} != 0 AND ${MediaStore.Audio.Media.DURATION} > 10000"
         val songs = mutableListOf<SongEntity>()
 
@@ -61,7 +64,11 @@ class MusicScanner(
             val artistIndex = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ARTIST)
             val albumIndex = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM)
             val albumIdIndex = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM_ID)
-            val genreIndex = cursor.getColumnIndex(MediaStore.Audio.Media.GENRE)
+            val genreIndex = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                cursor.getColumnIndex(MediaStore.Audio.Media.GENRE)
+            } else {
+                -1
+            }
             val durationIndex = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DURATION)
             val trackIndex = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.TRACK)
             val yearIndex = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.YEAR)
@@ -95,14 +102,23 @@ class MusicScanner(
         }
 
         database.withTransaction {
-            if (songs.isEmpty()) {
+            if (songs.isEmpty() && canTrustEmptyMediaStoreScan()) {
                 database.songDao().deleteAllSongs()
-            } else {
+            } else if (songs.isNotEmpty()) {
                 database.songDao().upsertSongs(songs)
                 database.songDao().deleteSongsNotIn(songs.map { it.id })
             }
         }
         songs.size
+    }
+
+    private fun canTrustEmptyMediaStoreScan(): Boolean {
+        val permission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            Manifest.permission.READ_MEDIA_AUDIO
+        } else {
+            Manifest.permission.READ_EXTERNAL_STORAGE
+        }
+        return ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
     }
 
     suspend fun scanTree(treeUri: Uri): Int = withContext(Dispatchers.IO) {

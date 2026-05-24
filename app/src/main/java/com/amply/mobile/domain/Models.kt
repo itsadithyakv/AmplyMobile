@@ -84,6 +84,7 @@ data class ArtistInfo(
     val artist: String,
     val summary: String,
     val sourceUrl: String?,
+    val imageUrl: String?,
     val fetchedAtSec: Long,
 )
 
@@ -108,6 +109,7 @@ data class AppSettings(
     val randomnessIntensity: Float = 0.30f,
     val preferSyncedLyrics: Boolean = true,
     val gaplessPlayback: Boolean = true,
+    val crossfadeSeconds: Float = 0f,
     val equalizerEnabled: Boolean = false,
     val eqBass: Float = 0.50f,
     val eqMid: Float = 0.50f,

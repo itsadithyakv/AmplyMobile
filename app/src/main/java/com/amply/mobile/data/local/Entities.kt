@@ -81,6 +81,7 @@ data class ArtistInfoEntity(
     @PrimaryKey val artist: String,
     val summary: String,
     val sourceUrl: String?,
+    val imageUrl: String?,
     val fetchedAtSec: Long,
 )
 

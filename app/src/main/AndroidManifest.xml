@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
@@ -33,10 +34,39 @@
         <service
             android:name=".playback.AmplyPlaybackService"
             android:exported="true"
-            android:foregroundServiceType="mediaPlayback">
+            android:foregroundServiceType="mediaPlayback"
+            android:stopWithTask="false"
+            tools:ignore="ExportedService">
             <intent-filter>
                 <action android:name="androidx.media3.session.MediaSessionService" />
+                <action android:name="android.intent.action.MEDIA_BUTTON" />
             </intent-filter>
         </service>
+
+        <receiver
+            android:name=".widget.AmplyWidgetProvider"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.amply.mobile.widget.PLAY_PAUSE" />
+                <action android:name="com.amply.mobile.widget.PREVIOUS" />
+                <action android:name="com.amply.mobile.widget.NEXT" />
+                <action android:name="com.amply.mobile.widget.REFRESH" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/amply_widget_info" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.AmplyLargeWidgetProvider"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/amply_widget_large_info" />
+        </receiver>
     </application>
 </manifest>

@@ -14,7 +14,7 @@ import androidx.room.RoomDatabase
         QueueStateEntity::class,
         SettingEntity::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = true,
 )
 abstract class AmplyDatabase : RoomDatabase() {

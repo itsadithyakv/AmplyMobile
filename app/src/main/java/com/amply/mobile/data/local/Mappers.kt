@@ -54,6 +54,7 @@ fun ArtistInfoEntity.toDomain(): ArtistInfo = ArtistInfo(
     artist = artist,
     summary = summary,
     sourceUrl = sourceUrl,
+    imageUrl = imageUrl,
     fetchedAtSec = fetchedAtSec,
 )
 

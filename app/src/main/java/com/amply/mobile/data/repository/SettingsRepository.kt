@@ -21,6 +21,7 @@ class SettingsRepository(
             randomnessIntensity = values["randomnessIntensity"]?.toFloatOrNull()?.coerceIn(0f, 1f) ?: 0.30f,
             preferSyncedLyrics = values["preferSyncedLyrics"]?.toBooleanStrictOrNull() ?: true,
             gaplessPlayback = values["gaplessPlayback"]?.toBooleanStrictOrNull() ?: true,
+            crossfadeSeconds = values["crossfadeSeconds"]?.toFloatOrNull()?.coerceIn(0f, 12f) ?: 0f,
             equalizerEnabled = values["equalizerEnabled"]?.toBooleanStrictOrNull() ?: false,
             eqBass = values["eqBass"]?.toFloatOrNull()?.coerceIn(0f, 1f) ?: 0.50f,
             eqMid = values["eqMid"]?.toFloatOrNull()?.coerceIn(0f, 1f) ?: 0.50f,
@@ -31,6 +32,9 @@ class SettingsRepository(
     suspend fun setMetadataFetchPaused(paused: Boolean) {
         settingsDao.upsert(SettingEntity("metadataFetchPaused", paused.toString()))
     }
+
+    suspend fun metadataFetchPaused(): Boolean =
+        settingsDao.valueFor("metadataFetchPaused")?.toBooleanStrictOrNull() ?: false
 
     suspend fun setDiscoveryIntensity(value: Float) {
         settingsDao.upsert(SettingEntity("discoveryIntensity", value.coerceIn(0f, 1f).toString()))
@@ -43,6 +47,12 @@ class SettingsRepository(
     suspend fun setGaplessPlayback(enabled: Boolean) {
         prefs.edit().putBoolean("gaplessPlayback", enabled).apply()
         settingsDao.upsert(SettingEntity("gaplessPlayback", enabled.toString()))
+    }
+
+    suspend fun setCrossfadeSeconds(seconds: Float) {
+        val clamped = seconds.coerceIn(0f, 12f)
+        prefs.edit().putFloat("crossfadeSeconds", clamped).apply()
+        settingsDao.upsert(SettingEntity("crossfadeSeconds", clamped.toString()))
     }
 
     suspend fun setEqualizerEnabled(enabled: Boolean) {

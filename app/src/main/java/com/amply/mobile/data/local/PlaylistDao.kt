@@ -13,6 +13,20 @@ interface PlaylistDao {
     @Query("SELECT * FROM playlists WHERE id = :playlistId")
     suspend fun playlistById(playlistId: String): PlaylistEntity?
 
+    @Query(
+        """
+        SELECT p.* FROM playlists p
+        WHERE EXISTS (
+            SELECT 1 FROM playlist_songs ps
+            WHERE ps.playlistId = p.id
+            LIMIT 1
+        )
+        ORDER BY p.type DESC, p.updatedAtSec DESC, p.name COLLATE NOCASE
+        LIMIT :limit
+        """,
+    )
+    suspend fun playablePlaylists(limit: Int): List<PlaylistEntity>
+
     @Query("SELECT songId FROM playlist_songs WHERE playlistId = :playlistId ORDER BY sortOrder")
     suspend fun songIdsForPlaylist(playlistId: String): List<Long>
 

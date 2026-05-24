@@ -4,10 +4,12 @@ import android.app.Application
 import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.amply.mobile.worker.MetadataEnrichmentWorker
 import com.amply.mobile.domain.CachedLyrics
 import com.amply.mobile.domain.ArtistInfo
 import com.amply.mobile.domain.LyricsCandidate
 import com.amply.mobile.domain.Playlist
+import com.amply.mobile.domain.RepeatMode
 import com.amply.mobile.domain.Song
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -90,7 +92,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val message: StateFlow<String?> = _message
 
     init {
-        scanLibrary()
         viewModelScope.launch {
             currentSong.collect { song ->
                 if (song != null) {
@@ -161,6 +162,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch { library.recordPlay(song.id, 0L) }
     }
 
+    fun playSingleThenDaily(song: Song) {
+        val queue = if (playbackState.value.repeatMode == RepeatMode.One) {
+            listOf(song)
+        } else {
+            dailyMixQueue(song, playlists.value, songs.value)
+        }
+        playback.playQueue(queue, 0)
+        viewModelScope.launch { library.recordPlay(song.id, 0L) }
+    }
+
     fun playPlaylist(playlist: Playlist) {
         viewModelScope.launch {
             val queue = library.songsByIds(playlist.songIds)
@@ -174,6 +185,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun seekTo(positionMs: Long) = playback.seekTo(positionMs)
     fun setShuffle(enabled: Boolean) = playback.setShuffle(enabled)
     fun cycleRepeatMode() = playback.cycleRepeatMode()
+    fun setRepeatMode(mode: RepeatMode) = playback.setRepeatMode(mode)
 
     fun toggleFavorite(song: Song) {
         viewModelScope.launch { library.toggleFavorite(song) }
@@ -247,6 +259,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun fetchAllMetadata() {
+        _message.value = "Fetching metadata..."
+        MetadataEnrichmentWorker.enqueueOneTime(getApplication())
+    }
+
     fun setMetadataPaused(paused: Boolean) {
         viewModelScope.launch { settingsRepository.setMetadataFetchPaused(paused) }
     }
@@ -261,6 +278,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setGapless(enabled: Boolean) {
         viewModelScope.launch { settingsRepository.setGaplessPlayback(enabled) }
+    }
+
+    fun setCrossfadeSeconds(value: Float) {
+        viewModelScope.launch { settingsRepository.setCrossfadeSeconds(value) }
     }
 
     fun setEqualizerEnabled(enabled: Boolean) {
@@ -281,5 +302,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun clearMessage() {
         _message.value = null
+    }
+
+    private fun dailyMixQueue(song: Song, playlists: List<Playlist>, songs: List<Song>): List<Song> {
+        val dailyMix = playlists.firstOrNull { playlist ->
+            val text = "${playlist.id} ${playlist.name}".lowercase()
+            "smart_daily_mix" in text || "daily mix" in text
+        }
+        val songsById = songs.associateBy { it.id }
+        val dailySongs = dailyMix
+            ?.songIds
+            ?.mapNotNull { songsById[it] }
+            .orEmpty()
+            .filterNot { it.id == song.id }
+        return listOf(song) + dailySongs
     }
 }

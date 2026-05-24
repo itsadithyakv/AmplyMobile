@@ -1,8 +1,10 @@
 package com.amply.mobile.worker
 
 import android.content.Context
+import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
@@ -28,12 +30,22 @@ class LibraryScanWorker(
 
         fun enqueue(context: Context) {
             val request = PeriodicWorkRequestBuilder<LibraryScanWorker>(12, TimeUnit.HOURS)
+                .setConstraints(
+                    Constraints.Builder()
+                        .setRequiredNetworkType(NetworkType.NOT_REQUIRED)
+                        .setRequiresBatteryNotLow(true)
+                        .build(),
+                )
                 .build()
             WorkManager.getInstance(context).enqueueUniquePeriodicWork(
                 UNIQUE_NAME,
                 ExistingPeriodicWorkPolicy.KEEP,
                 request,
             )
+        }
+
+        fun cancel(context: Context) {
+            WorkManager.getInstance(context).cancelUniqueWork(UNIQUE_NAME)
         }
     }
 }

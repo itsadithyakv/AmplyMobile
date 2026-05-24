@@ -55,7 +55,7 @@ class MetadataRepository(
         }
         artistInfoDao.infoFor(artist)?.toDomain()?.let { return@withContext it }
         val fetched = fetchWikipediaArtistInfo(artist) ?: notFound(artist)
-        artistInfoDao.upsert(ArtistInfoEntity(fetched.artist, fetched.summary, fetched.sourceUrl, nowSec()))
+        artistInfoDao.upsert(ArtistInfoEntity(fetched.artist, fetched.summary, fetched.sourceUrl, fetched.imageUrl, nowSec()))
         fetched
     }
 
@@ -136,6 +136,7 @@ class MetadataRepository(
                     artist = artist,
                     summary = summary,
                     sourceUrl = payload.optJSONObject("content_urls")?.optJSONObject("desktop")?.optString("page"),
+                    imageUrl = payload.optJSONObject("thumbnail")?.optString("source")?.takeIf { it.isNotBlank() },
                     fetchedAtSec = nowSec(),
                 )
             }
@@ -146,6 +147,7 @@ class MetadataRepository(
         artist = artist,
         summary = "Opps, I cant find that!",
         sourceUrl = null,
+        imageUrl = null,
         fetchedAtSec = nowSec(),
     )
 }

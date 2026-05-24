@@ -16,6 +16,19 @@ interface SongDao {
     @Query("SELECT * FROM songs WHERE id = :songId")
     suspend fun songById(songId: Long): SongEntity?
 
+    @Query(
+        """
+        SELECT * FROM songs
+        WHERE id != :excludeSongId
+        ORDER BY
+            CASE WHEN lastPlayedAtSec IS NULL THEN 0 ELSE 1 END DESC,
+            lastPlayedAtSec DESC,
+            addedAtSec DESC
+        LIMIT :limit
+        """,
+    )
+    suspend fun recentSongsForWidget(excludeSongId: Long, limit: Int): List<SongEntity>
+
     @Query("SELECT * FROM songs WHERE id IN (:songIds)")
     suspend fun songsByIds(songIds: List<Long>): List<SongEntity>
 

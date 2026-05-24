@@ -1,4 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Amply</string>
+    <string name="widget_description">Control Amply playback from your home screen.</string>
+    <string name="widget_large_description">Control playback and start Amply playlists from your home screen.</string>
+    <string name="widget_no_song">No song playing</string>
+    <string name="widget_mix">Mix</string>
+    <string name="widget_previous">Previous</string>
+    <string name="widget_play_pause">Play or pause</string>
+    <string name="widget_next">Next</string>
 </resources>
