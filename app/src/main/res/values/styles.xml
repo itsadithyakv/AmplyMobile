@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.Amply" parent="android:style/Theme.Material.NoActionBar">
+    <!-- First frame before Compose draws: the desktop's light surface (amply-bg 236 232 225). -->
+    <style name="Theme.Amply" parent="android:style/Theme.Material.Light.NoActionBar">
         <item name="android:windowNoTitle">true</item>
         <item name="android:windowActionBar">false</item>
-        <item name="android:windowLightStatusBar">false</item>
-        <item name="android:statusBarColor">#0D0D0D</item>
-        <item name="android:navigationBarColor">#0D0D0D</item>
+        <item name="android:windowBackground">@color/amply_bg</item>
+        <item name="android:colorAccent">@color/amply_accent</item>
     </style>
 </resources>

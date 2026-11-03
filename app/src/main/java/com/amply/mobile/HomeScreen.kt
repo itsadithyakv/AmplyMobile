@@ -128,6 +128,11 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
+import com.amply.mobile.ui.theme.NeuDepth
+import com.amply.mobile.ui.theme.Palette
+import com.amply.mobile.ui.theme.neuPressed
+import com.amply.mobile.ui.theme.neuRaised
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.amply.mobile.domain.CachedLyrics
@@ -169,61 +174,86 @@ fun HomeScreen(
     onSong: (Song) -> Unit,
     onSearch: () -> Unit,
     onSettings: () -> Unit,
+    onShuffleAll: () -> Unit,
+    onPlayArtist: (List<Song>) -> Unit,
+    planLabel: String? = null,
+    showProMixesTeaser: Boolean = false,
+    onProMixes: () -> Unit = {},
 ) {
+    val p = Palette
     val explorePlaylists = remember(playlists) { pickExplorePlaylists(playlists) }
     val recentSongs = remember(songs) { songs.recentlyPlayedOrAdded().take(12) }
     val libraryArtists = remember(songs) { pickLibraryArtists(songs) }
+    // Built once per library change; every card used to rebuild this map for itself.
+    val songsById = remember(songs) { songs.associateBy { it.id } }
     val genreMixes = remember(playlists) { pickHomeGenreMixes(playlists) }
     val forYouToday = remember(playlists) { pickForYouToday(playlists) }
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = 22.dp, end = 22.dp, top = 24.dp, bottom = 126.dp),
-        verticalArrangement = Arrangement.spacedBy(18.dp),
+        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(22.dp),
     ) {
         item {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                AmplyLogo(Modifier.size(54.dp))
-                Spacer(Modifier.width(12.dp))
-                Text(
-                    "Amply",
-                    style = MaterialTheme.typography.displaySmall,
-                    fontFamily = AmplyBrand,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
+                AmplyLogo(Modifier.size(38.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Amply", style = MaterialTheme.typography.headlineMedium.copy(letterSpacing = (-0.045).em))
+                if (planLabel != null) {
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        planLabel,
+                        color = p.textSecondary,
+                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, letterSpacing = 0.08.em),
+                        modifier = Modifier.neuPressed(CircleShape).padding(horizontal = 9.dp, vertical = 4.dp),
+                    )
+                }
                 Spacer(Modifier.weight(1f))
-                AmplyIconButton(Icons.Rounded.Search, "Search", onClick = onSearch)
+                if (songs.isNotEmpty()) {
+                    NeuIconButton(Icons.Rounded.Shuffle, "Shuffle all songs", onShuffleAll, size = 42.dp)
+                    Spacer(Modifier.width(10.dp))
+                }
+                NeuIconButton(Icons.Rounded.Search, "Search", onSearch, size = 42.dp)
                 Spacer(Modifier.width(10.dp))
                 OverflowActions(onAddFolder, onScan, onRefreshSmart, onSettings)
             }
             if (busy) {
                 Spacer(Modifier.height(14.dp))
                 LinearProgressIndicator(
-                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(4.dp)),
-                    color = AmplyOrange,
-                    trackColor = AmplyPanel,
+                    modifier = Modifier.fillMaxWidth().clip(CircleShape),
+                    color = p.accent,
+                    trackColor = p.bgDeep,
                 )
             }
         }
-        if (explorePlaylists.isNotEmpty()) {
+        if (songs.isEmpty()) {
+            if (!busy) item { EmptyLibraryActions(onAddFolder = onAddFolder, onScan = onScan) }
+            return@LazyColumn
+        }
+        val featured = explorePlaylists.firstOrNull()
+        if (featured != null) {
             item {
-                PlaylistExploreCarousel(
-                    playlists = explorePlaylists,
-                    songs = songs,
-                    onOpenPlaylist = onOpenPlaylist,
-                    onPlayPlaylist = onPlayPlaylist,
+                FeaturedMixCard(
+                    playlist = featured,
+                    artworkUri = playlistBackgroundUri(featured, songsById),
+                    onOpen = { onOpenPlaylist(featured.id) },
+                    onPlay = { onPlayPlaylist(featured) },
                 )
             }
         } else if (!busy) {
-            item { HomeExploreEmptyState(onAddFolder = onAddFolder, onScan = onScan) }
+            item { HomeExploreEmptyState(onRefresh = onRefreshSmart) }
+        }
+        val morePlaylists = explorePlaylists.drop(1)
+        if (morePlaylists.isNotEmpty()) {
+            item {
+                TileRow("Smart Playlists", morePlaylists, key = { it.id }) { playlist ->
+                    SmartMixCard(playlist, songsById, onOpen = { onOpenPlaylist(playlist.id) }, onPlay = { onPlayPlaylist(playlist) })
+                }
+            }
         }
         if (recentSongs.isNotEmpty()) {
             item {
-                SectionHeader(title = "Recently Played", action = if (recentSongs.size > 4) "See all" else null)
-                Spacer(Modifier.height(12.dp))
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(end = 8.dp)) {
-                    items(recentSongs, key = { it.id }) { song ->
-                        HomeSectionCard(item = HomeQuickItem.SongItem(song), songs = songs, onSong = onSong, onOpenPlaylist = onOpenPlaylist, onPlayPlaylist = onPlayPlaylist)
-                    }
+                TileRow(if (recentSongs.any { it.lastPlayedAtSec != null }) "Recently Played" else "Recently Added", recentSongs, key = { it.id }) { song ->
+                    SongTile(song = song, onPlay = { onSong(song) })
                 }
             }
         }
@@ -231,320 +261,174 @@ fun HomeScreen(
             item {
                 SectionHeader(title = "Top Artists")
                 Spacer(Modifier.height(12.dp))
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(16.dp), contentPadding = PaddingValues(vertical = 6.dp, horizontal = 4.dp)) {
                     items(libraryArtists, key = { it.name }) { artist ->
-                        ArtistBubble(artist = artist, onClick = { onSong(artist.song) })
+                        ArtistBubble(artist = artist, onClick = { onPlayArtist(artist.songs) })
                     }
                 }
             }
         }
         if (genreMixes.isNotEmpty()) {
             item {
-                SectionHeader(title = "Genre Mixes", action = if (genreMixes.size > 4) "See all" else null)
-                Spacer(Modifier.height(12.dp))
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(end = 8.dp)) {
-                    items(genreMixes, key = { it.id }) { playlist ->
-                        HomeSectionCard(item = HomeQuickItem.PlaylistItem(playlist), songs = songs, onSong = onSong, onOpenPlaylist = onOpenPlaylist, onPlayPlaylist = onPlayPlaylist)
+                TileRow("Genre Mixes", genreMixes, key = { it.id }) { playlist ->
+                    SmartMixCard(playlist, songsById, onOpen = { onOpenPlaylist(playlist.id) }, onPlay = { onPlayPlaylist(playlist) })
+                }
+            }
+        }
+        if (showProMixesTeaser) {
+            item {
+                NeuCard(Modifier.clickable(onClickLabel = "Learn about Amply Pro", onClick = onProMixes)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Genre and mood mixes", style = MaterialTheme.typography.titleMedium)
+                            Text("A mix for every genre and mood in your library, with Amply Pro.", color = p.textSecondary, style = MaterialTheme.typography.bodySmall)
+                        }
+                        ProLock(Modifier.size(18.dp))
                     }
                 }
             }
         }
         if (forYouToday.isNotEmpty()) {
             item {
-                SectionHeader(title = "For You Today", action = if (forYouToday.size > 4) "See all" else null)
-                Spacer(Modifier.height(12.dp))
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(end = 8.dp)) {
-                    items(forYouToday, key = { it.id }) { playlist ->
-                        HomeSectionCard(item = HomeQuickItem.PlaylistItem(playlist), songs = songs, onSong = onSong, onOpenPlaylist = onOpenPlaylist, onPlayPlaylist = onPlayPlaylist)
-                    }
+                TileRow("For You Today", forYouToday, key = { it.id }) { playlist ->
+                    SmartMixCard(playlist, songsById, onOpen = { onOpenPlaylist(playlist.id) }, onPlay = { onPlayPlaylist(playlist) })
                 }
             }
         }
-        if (songs.isEmpty() && !busy) {
-            item { EmptyLibraryActions(onAddFolder = onAddFolder, onScan = onScan) }
+    }
+}
+
+/** A titled horizontal row of tiles. Vertical padding leaves room for the tiles' shadows. */
+@Composable
+fun <T> TileRow(title: String, items: List<T>, key: (T) -> Any, tile: @Composable (T) -> Unit) {
+    Column {
+        SectionHeader(title = title)
+        Spacer(Modifier.height(6.dp))
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            contentPadding = PaddingValues(vertical = 8.dp, horizontal = 4.dp),
+        ) {
+            items(items, key = key) { tile(it) }
         }
     }
 }
 
+/** The desktop's "Featured mix" hero: cover on the right fading into the surface, text on the left. */
 @Composable
-fun PlaylistExploreCarousel(
-    playlists: List<Playlist>,
-    songs: List<Song>,
-    onOpenPlaylist: (String) -> Unit,
-    onPlayPlaylist: (Playlist) -> Unit,
-) {
-    val listState = rememberLazyListState()
-    val selectedIndex by remember {
-        derivedStateOf {
-            val layoutInfo = listState.layoutInfo
-            val viewportCenter = (layoutInfo.viewportStartOffset + layoutInfo.viewportEndOffset) / 2
-            layoutInfo.visibleItemsInfo
-                .minByOrNull { item -> abs((item.offset + item.size / 2) - viewportCenter) }
-                ?.index
-                ?: 0
+fun FeaturedMixCard(playlist: Playlist, artworkUri: String?, onOpen: () -> Unit, onPlay: () -> Unit) {
+    val p = Palette
+    val bitmap by rememberArtwork(artworkUri, 768)
+    val subtitle = playlist.description.ifBlank { if (playlist.type == PlaylistType.Custom) "Your playlist" else "Made by Amply" }
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .height(196.dp)
+            .neuRaised(RadiusLg, NeuDepth.Raised)
+            .clip(RadiusLg)
+            .clickable(onClickLabel = "Open ${playlist.name}", onClick = onOpen),
+    ) {
+        val image = bitmap
+        if (image != null) {
+            Image(
+                bitmap = image,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxHeight().fillMaxWidth(0.62f).align(Alignment.CenterEnd),
+            )
         }
-    }
-
-    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        SectionHeader(title = "Explore")
-        LazyRow(
-            state = listState,
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 12.dp),
-            modifier = Modifier.fillMaxWidth().height(252.dp),
-        ) {
-            items(playlists, key = { it.id }) { playlist ->
-                val index = playlists.indexOfFirst { it.id == playlist.id }
-                val selected = index == selectedIndex
-                ExplorePlaylistCard(
-                    playlist = playlist,
-                    songs = songs,
-                    selected = selected,
-                    onOpen = { onOpenPlaylist(playlist.id) },
-                    onPlay = { onPlayPlaylist(playlist) },
-                )
+        Box(
+            Modifier.fillMaxSize().background(
+                // Fully opaque until just past where the cover starts (38%), so its edge never shows.
+                Brush.horizontalGradient(0f to p.bg, 0.42f to p.bg, 0.72f to p.bg.copy(alpha = 0.45f), 1f to p.bg.copy(alpha = 0f)),
+            ),
+        )
+        Column(Modifier.fillMaxSize().padding(20.dp), verticalArrangement = Arrangement.SpaceBetween) {
+            Column(Modifier.fillMaxWidth(0.66f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Eyebrow("Featured mix")
+                Text(playlist.name.cleanMixName(), style = MaterialTheme.typography.headlineMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(subtitle, color = p.textSecondary, style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                NeuButton("Play", Icons.Rounded.PlayArrow, onPlay, accent = true)
+                Spacer(Modifier.width(12.dp))
+                Text("${playlist.songIds.size} songs", color = p.textSecondary, style = MaterialTheme.typography.bodySmall)
             }
         }
     }
 }
 
+/** Raised tile: cover, title and subtitle, with an amber play button on the cover. */
 @Composable
-fun ExplorePlaylistCard(
-    playlist: Playlist,
-    songs: List<Song>,
-    selected: Boolean,
+private fun CoverTile(
+    title: String,
+    subtitle: String,
+    artworkUri: String?,
+    audioUri: String?,
     onOpen: () -> Unit,
     onPlay: () -> Unit,
 ) {
-    val glowAlpha by animateFloatAsState(if (selected) 0.40f else 0f, animationSpec = tween(260), label = "explore-glow")
-    val cardAlpha by animateFloatAsState(if (selected) 1f else 0.70f, animationSpec = tween(260), label = "explore-alpha")
-    val cardScale by animateFloatAsState(if (selected) 1f else 0.94f, animationSpec = tween(260), label = "explore-scale")
-    val subtitle = playlist.description.ifBlank { if (playlist.type == PlaylistType.Custom) "Your playlist" else "Made by Amply" }
-    val songCount = playlist.songIds.size
-    Box(
-        modifier = Modifier
-            .width(274.dp)
-            .fillMaxHeight()
-            .graphicsLayer {
-                alpha = cardAlpha
-                scaleX = cardScale
-                scaleY = cardScale
-            },
-        contentAlignment = Alignment.Center,
+    val p = Palette
+    Column(
+        Modifier
+            .width(146.dp)
+            .neuRaised(RadiusLg, NeuDepth.Raised)
+            .clip(RadiusLg)
+            .clickable(onClickLabel = "Open $title", onClick = onOpen)
+            .padding(9.dp),
     ) {
-        Box(
-            modifier = Modifier
-                .matchParentSize()
-                .graphicsLayer(alpha = glowAlpha)
-                .background(
-                    Brush.radialGradient(
-                        colors = listOf(AmplyOrange.copy(alpha = 0.62f), AmplyOrange.copy(alpha = 0.18f), Color.Transparent),
-                        center = Offset(148f, 118f),
-                        radius = 245f,
-                    ),
-                ),
-        )
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 8.dp, vertical = 8.dp)
-                .clip(RoundedCornerShape(30.dp))
-                .background(
-                    Brush.verticalGradient(
-                        listOf(Color(0xFF242424), Color(0xFF151515), Color(0xFF0D0D0D)),
-                    ),
-                )
-                .clickable(onClick = onOpen)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                ArtworkBox(playlistBackgroundUri(playlist, songs), 84.dp, shape = RoundedCornerShape(24.dp))
-                Spacer(Modifier.width(14.dp))
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(playlist.name.cleanMixName(), maxLines = 2, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black)
-                    Text(subtitle, maxLines = 2, overflow = TextOverflow.Ellipsis, color = AmplyMuted, style = MaterialTheme.typography.bodySmall)
-                }
-            }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("$songCount songs", color = AmplyMuted, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-                Button(
-                    onClick = onPlay,
-                    colors = ButtonDefaults.buttonColors(containerColor = AmplyOrange, contentColor = Color(0xFF160B02)),
-                    shape = RoundedCornerShape(24.dp),
-                    contentPadding = PaddingValues(horizontal = 22.dp, vertical = 10.dp),
-                ) {
-                    Icon(Icons.Rounded.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text("Play", fontWeight = FontWeight.Black)
-                }
+        Box {
+            ArtworkBox(artworkUri, 128.dp, shape = RadiusMd, audioUri = audioUri)
+            Box(Modifier.align(Alignment.BottomEnd).padding(7.dp)) {
+                NeuIconButton(Icons.Rounded.PlayArrow, "Play $title", onPlay, size = 36.dp, accent = true)
             }
         }
-    }
-}
-
-sealed class HomeQuickItem {
-    abstract val key: String
-    abstract val title: String
-
-    data class SongItem(val song: Song) : HomeQuickItem() {
-        override val key: String = "song-${song.id}"
-        override val title: String = song.title
-    }
-
-    data class PlaylistItem(val playlist: Playlist) : HomeQuickItem() {
-        override val key: String = "playlist-${playlist.id}"
-        override val title: String = playlist.name
-    }
-}
-
-object AmplyHomeCardShape : Shape {
-    override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density): Outline {
-        val w = size.width
-        val h = size.height
-        val c = min(w, h) * 0.14f
-        val k = 0.55f
-        val path = Path().apply {
-            moveTo(c, 0f)
-            lineTo(w - c, 0f)
-            cubicTo(w - c * k, 0f, w, c * k, w, c)
-            lineTo(w, h - c)
-            cubicTo(w, h - c * k, w - c * k, h, w - c, h)
-            lineTo(c, h)
-            cubicTo(c * k, h, 0f, h - c * k, 0f, h - c)
-            lineTo(0f, c)
-            cubicTo(0f, c * k, c * k, 0f, c, 0f)
-            close()
-        }
-        return Outline.Generic(path)
+        Spacer(Modifier.height(9.dp))
+        Text(title, style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(horizontal = 3.dp))
+        Text(subtitle, color = p.textSecondary, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(horizontal = 3.dp))
+        Spacer(Modifier.height(3.dp))
     }
 }
 
 @Composable
-fun HomeSectionCard(
-    item: HomeQuickItem,
-    songs: List<Song>,
-    onSong: (Song) -> Unit,
-    onOpenPlaylist: (String) -> Unit,
-    onPlayPlaylist: (Playlist) -> Unit,
-) {
-    when (item) {
-        is HomeQuickItem.PlaylistItem -> SmartMixCard(
-            playlist = item.playlist,
-            songs = songs,
-            onOpen = { onOpenPlaylist(item.playlist.id) },
-            onPlay = { onPlayPlaylist(item.playlist) },
-        )
-        is HomeQuickItem.SongItem -> SongSquircleCard(song = item.song, onClick = { onSong(item.song) }, onPlay = { onSong(item.song) })
-    }
-}
-
-@Composable
-fun SongSquircleCard(song: Song, onClick: () -> Unit, onPlay: () -> Unit) {
-    val bitmap by rememberArtwork(song.artworkUri)
-    Box(
-        modifier = Modifier
-            .width(128.dp)
-            .height(142.dp)
-            .clip(AmplyHomeCardShape)
-            .background(AmplyCard)
-            .clickable(onClick = onClick),
-    ) {
-        if (bitmap != null) {
-            Image(bitmap = bitmap!!, contentDescription = null, modifier = Modifier.fillMaxSize().blur(4.dp), contentScale = ContentScale.Crop)
-        }
-        Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.14f), Color.Black.copy(alpha = 0.86f)))))
-        Column(Modifier.fillMaxSize().padding(12.dp), verticalArrangement = Arrangement.SpaceBetween) {
-            Text(song.title, maxLines = 2, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Black)
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(song.artist, color = AmplyMuted, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                IconButton(onClick = onPlay, modifier = Modifier.size(34.dp).clip(CircleShape).background(AmplyOrange)) {
-                    Icon(Icons.Rounded.PlayArrow, contentDescription = "Play", tint = Color(0xFF160B02), modifier = Modifier.size(18.dp))
-                }
-            }
-        }
-    }
-}
+fun SongTile(song: Song, onPlay: () -> Unit) =
+    CoverTile(song.title, song.artist, song.artworkUri, song.contentUri, onOpen = onPlay, onPlay = onPlay)
 
 @Composable
 fun SmartMixCard(
     playlist: Playlist,
-    songs: List<Song>,
+    songsById: Map<Long, Song>,
     onOpen: () -> Unit,
     onPlay: () -> Unit,
 ) {
-    val bitmap by rememberArtwork(playlistBackgroundUri(playlist, songs))
-    val subtitle = if (playlist.type == PlaylistType.Custom) "Your playlist" else playlist.description.ifBlank { "Made by Amply" }
-    Box(
-        modifier = Modifier
-            .width(128.dp)
-            .height(142.dp)
-            .clip(AmplyHomeCardShape)
-            .background(AmplyCard)
-            .clickable(onClick = onOpen),
-    ) {
-        if (bitmap != null) {
-            Image(
-                bitmap = bitmap!!,
-                contentDescription = null,
-                modifier = Modifier.fillMaxSize().blur(5.dp),
-                contentScale = ContentScale.Crop,
-            )
-        }
-        Box(
-            Modifier
-                .fillMaxSize()
-                .background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.20f), Color.Black.copy(alpha = 0.86f)))),
-        )
-        Column(
-            Modifier
-                .fillMaxSize()
-                .padding(12.dp),
-            verticalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Text(playlist.name.cleanMixName(), maxLines = 2, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Black)
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(subtitle, color = AmplyMuted, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                IconButton(
-                    onClick = onPlay,
-                    modifier = Modifier.size(34.dp).clip(CircleShape).background(AmplyOrange),
-                ) {
-                    Icon(Icons.Rounded.PlayArrow, contentDescription = "Play", tint = Color(0xFF160B02), modifier = Modifier.size(18.dp))
-                }
-            }
-        }
-    }
+    val subtitle = if (playlist.type == PlaylistType.Custom) "Your playlist" else "${playlist.songIds.size} songs"
+    CoverTile(playlist.name.cleanMixName(), subtitle, playlistBackgroundUri(playlist, songsById), null, onOpen, onPlay)
 }
 
+/** Songs exist but no mixes yet (they are generated after a scan). */
 @Composable
-fun HomeExploreEmptyState(onAddFolder: () -> Unit, onScan: () -> Unit) {
-    Card(colors = CardDefaults.cardColors(containerColor = AmplyGlass), shape = AmplyHomeCardShape) {
-        Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("Explore", fontWeight = FontWeight.Black, style = MaterialTheme.typography.titleLarge)
-            Text("Add songs to start building your local home screen.", color = AmplyMuted)
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Button(onClick = onAddFolder, colors = ButtonDefaults.buttonColors(containerColor = AmplyOrange)) {
-                    Text("Add folder")
-                }
-                OutlinedButton(onClick = onScan) {
-                    Text("Scan")
-                }
-            }
+fun HomeExploreEmptyState(onRefresh: () -> Unit) {
+    NeuCard {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text("Smart playlists", style = MaterialTheme.typography.titleLarge)
+            Text("Amply builds daily mixes, genre and mood mixes from what you play.", color = Palette.textSecondary, style = MaterialTheme.typography.bodyMedium)
+            NeuButton("Build my mixes", Icons.Rounded.Shuffle, onRefresh, accent = true)
         }
     }
 }
 
-data class LibraryArtist(val name: String, val artworkUri: String?, val song: Song)
+data class LibraryArtist(val name: String, val artworkUri: String?, val songs: List<Song>)
 
 @Composable
 fun ArtistBubble(artist: LibraryArtist, onClick: () -> Unit) {
     Column(
-        modifier = Modifier.width(88.dp).clickable(onClick = onClick),
+        modifier = Modifier.width(84.dp).clip(RadiusMd).clickable(onClickLabel = "Play ${artist.name}", onClick = onClick).padding(vertical = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        ArtworkBox(artist.artworkUri, 78.dp, shape = CircleShape)
-        Text(artist.name, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+        Box(Modifier.neuRaised(CircleShape, NeuDepth.Raised).padding(4.dp)) {
+            ArtworkBox(artist.artworkUri, 66.dp, shape = CircleShape, audioUri = artist.songs.firstOrNull()?.contentUri)
+        }
+        Text(artist.name, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold))
     }
 }
 
@@ -554,7 +438,7 @@ fun SectionHeader(title: String, action: String? = null) {
         SectionTitle(title)
         Spacer(Modifier.weight(1f))
         if (action != null) {
-            Text(action, color = AmplyMuted, style = MaterialTheme.typography.bodyMedium)
+            Text(action, color = Palette.textSecondary, style = MaterialTheme.typography.bodyMedium)
         }
     }
 }
@@ -622,18 +506,20 @@ fun List<Song>.recentlyPlayedOrAdded(): List<Song> =
             .thenByDescending { it.addedAtSec },
     )
 
+/** Artists ranked by how much they are actually played (the old list was alphabetical). */
 fun pickLibraryArtists(songs: List<Song>): List<LibraryArtist> =
     songs
-        .filter { it.artist.isNotBlank() && !it.artist.equals("unknown", ignoreCase = true) }
+        .filter { it.artist.isNotBlank() && !it.artist.startsWith("unknown", ignoreCase = true) }
         .groupBy { it.artist.trim() }
-        .mapNotNull { (artist, artistSongs) ->
-            val bestSong = artistSongs
-                .sortedWith(compareByDescending<Song> { it.lastPlayedAtSec ?: 0L }.thenByDescending { it.addedAtSec })
-                .firstOrNull()
-            bestSong?.let { LibraryArtist(name = artist, artworkUri = it.artworkUri, song = it) }
+        .map { (artist, artistSongs) ->
+            val ordered = artistSongs.sortedWith(
+                compareByDescending<Song> { it.playCount }.thenByDescending { it.lastPlayedAtSec ?: 0L }.thenByDescending { it.addedAtSec },
+            )
+            Triple(artist, ordered, artistSongs.sumOf { it.totalPlayMs })
         }
-        .sortedBy { it.name.lowercase() }
+        .sortedWith(compareByDescending<Triple<String, List<Song>, Long>> { it.third }.thenByDescending { it.second.size }.thenBy { it.first.lowercase() })
         .take(12)
+        .map { (artist, ordered, _) -> LibraryArtist(name = artist, artworkUri = ordered.firstNotNullOfOrNull { it.artworkUri }, songs = ordered) }
 
 fun playlistPriority(playlist: Playlist): Int {
     val text = "${playlist.id} ${playlist.name}".lowercase()
@@ -650,13 +536,11 @@ fun playlistPriority(playlist: Playlist): Int {
     }
 }
 
-fun playlistBackgroundUri(playlist: Playlist, songs: List<Song>): String? {
-    val byId = songs.associateBy { it.id }
-    return playlist.songIds
-        .mapNotNull { byId[it]?.artworkUri }
-        .firstOrNull()
-        ?: playlist.artworkUri
-        ?: songs.firstOrNull { playlist.name.contains(it.artist, ignoreCase = true) }?.artworkUri
+fun playlistBackgroundUri(playlist: Playlist, songsById: Map<Long, Song>): String? {
+    // Mixes often start with the same top song; picking a cover by playlist id keeps tiles distinct.
+    val covers = playlist.songIds.asSequence().take(12).mapNotNull { songsById[it]?.artworkUri }.distinct().toList()
+    if (covers.isEmpty()) return playlist.artworkUri
+    return covers[(playlist.id.hashCode() and Int.MAX_VALUE) % covers.size]
 }
 
 fun String.cleanMixName(): String =

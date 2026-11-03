@@ -1,6 +1,16 @@
 package com.amply.mobile
 
 import android.Manifest
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
+import androidx.compose.material.icons.automirrored.rounded.QueueMusic
+import androidx.compose.material.icons.rounded.Bedtime
+import androidx.compose.material.icons.rounded.RepeatOne
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.progressBarRangeInfo
+import androidx.compose.ui.semantics.semantics
+import com.amply.mobile.playback.SleepTimerState
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -145,6 +155,10 @@ import com.amply.mobile.ui.theme.AmplyLime
 import com.amply.mobile.ui.theme.AmplyMuted
 import com.amply.mobile.ui.theme.AmplyOrange
 import com.amply.mobile.ui.theme.AmplyPanel
+import com.amply.mobile.ui.theme.NeuDepth
+import com.amply.mobile.ui.theme.Palette
+import com.amply.mobile.ui.theme.neuPressed
+import com.amply.mobile.ui.theme.neuRaised
 import com.amply.mobile.ui.theme.AmplyTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -168,37 +182,48 @@ fun NowPlayingScreen(
     onSeek: (Long) -> Unit,
     onShuffle: (Boolean) -> Unit,
     onRepeat: () -> Unit,
-    onRepeatMode: (RepeatMode) -> Unit,
     onFavorite: () -> Unit,
     onFetchLyrics: () -> Unit,
     onLoadLyrics: () -> Unit,
     onBack: () -> Unit,
+    upNext: List<QueueEntry> = emptyList(),
+    sleepTimer: SleepTimerState = SleepTimerState.Off,
+    onQueuePlay: (Int) -> Unit = {},
+    onQueueRemove: (Int) -> Unit = {},
+    onSleepTimer: (Int) -> Unit = {},
+    onAddToPlaylist: () -> Unit = {},
 ) {
     LaunchedEffect(song?.id) { if (song != null) onLoadLyrics() }
     var lyricsOpen by remember(song?.id) { mutableStateOf(false) }
+    var queueOpen by remember { mutableStateOf(false) }
+    var sleepOpen by remember { mutableStateOf(false) }
+    // While the user drags the disc or the bar, show where they are without seeking every frame.
+    var scrubMs by remember(song?.id) { mutableStateOf<Long?>(null) }
+    BackHandler(enabled = lyricsOpen) { lyricsOpen = false }
     if (song == null) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Text("No song playing", color = AmplyMuted)
         }
         return
     }
-    val bitmap by rememberArtwork(song.artworkUri)
-    val currentLyric = remember(lyrics?.raw, playback.positionMs) {
-        currentLyricWindow(lyrics?.raw.orEmpty(), playback.positionMs)
-    }
+    val bitmap by rememberArtwork(song.artworkUri, 1024, song.contentUri.ifBlank { null })
+    // Parse once per lyrics change; this used to re-parse the whole LRC four times a second.
+    val parsedLyrics = remember(lyrics?.raw) { parseLrc(lyrics?.raw.orEmpty()).filter { it.text.isNotBlank() } }
+    val currentLyric = currentLyricWindow(parsedLyrics, playback.positionMs)
+    val shown = scrubMs?.let { playback.copy(positionMs = it) } ?: playback
     Box(Modifier.fillMaxSize()) {
         if (bitmap != null) {
             Image(
                 bitmap = bitmap!!,
                 contentDescription = null,
-                modifier = Modifier.fillMaxSize().blur(36.dp).graphicsLayer(alpha = 0.22f),
+                modifier = Modifier.fillMaxSize().blur(40.dp).graphicsLayer(alpha = if (Palette.isDark) 0.22f else 0.16f),
                 contentScale = ContentScale.Crop,
             )
         }
         Box(
             Modifier
                 .fillMaxSize()
-                .background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.34f), AmplyBg, Color(0xFF050505)))),
+                .background(Brush.verticalGradient(listOf(Palette.bg.copy(alpha = 0.45f), Palette.bg, Palette.bg))),
         )
         if (lyricsOpen) {
             FullLyricsView(
@@ -227,7 +252,12 @@ fun NowPlayingScreen(
                         Spacer(Modifier.weight(1f))
                         Text("Now Playing", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Black)
                         Spacer(Modifier.weight(1f))
-                        AmplyIconButton(if (song.favorite) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder, "Favorite", onFavorite)
+                        AmplyIconButton(
+                            if (song.favorite) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
+                            if (song.favorite) "Remove from liked songs" else "Add to liked songs",
+                            onFavorite,
+                            active = song.favorite,
+                        )
                     }
                 }
                 item {
@@ -235,6 +265,7 @@ fun NowPlayingScreen(
                         song = song,
                         bitmap = bitmap,
                         playback = playback,
+                        onScrub = { scrubMs = it },
                         onSeek = onSeek,
                         modifier = Modifier.fillMaxWidth(0.84f).aspectRatio(1f),
                     )
@@ -252,18 +283,7 @@ fun NowPlayingScreen(
                     }
                 }
                 item {
-                    PlayerProgress(playback = playback, onSeek = onSeek)
-                }
-                item {
-                    PlaybackModeOptions(
-                        shuffle = playback.shuffle,
-                        repeatMode = playback.repeatMode,
-                        onOrder = { onShuffle(false) },
-                        onShuffle = { onShuffle(true) },
-                        onLoopSong = {
-                            onRepeatMode(if (playback.repeatMode == RepeatMode.One) RepeatMode.Off else RepeatMode.One)
-                        },
-                    )
+                    PlayerProgress(playback = shown, onScrub = { scrubMs = it }, onSeek = onSeek)
                 }
                 item {
                     PlayerControls(
@@ -271,6 +291,19 @@ fun NowPlayingScreen(
                         onPrevious = onPrevious,
                         onPlayPause = onPlayPause,
                         onNext = onNext,
+                    )
+                }
+                item {
+                    PlayerTools(
+                        shuffle = playback.shuffle,
+                        repeatMode = playback.repeatMode,
+                        sleepLabel = sleepTimerLabel(sleepTimer),
+                        queueCount = upNext.size,
+                        onShuffle = { onShuffle(!playback.shuffle) },
+                        onRepeat = onRepeat,
+                        onSleep = { sleepOpen = true },
+                        onQueue = { queueOpen = true },
+                        onAddToPlaylist = onAddToPlaylist,
                     )
                 }
                 item {
@@ -284,6 +317,12 @@ fun NowPlayingScreen(
                 }
             }
         }
+    }
+    if (queueOpen) {
+        QueueSheet(current = song, upNext = upNext, onDismiss = { queueOpen = false }, onPlay = onQueuePlay, onRemove = onQueueRemove)
+    }
+    if (sleepOpen) {
+        SleepTimerSheet(state = sleepTimer, onDismiss = { sleepOpen = false }, onSet = onSleepTimer)
     }
 }
 
@@ -313,6 +352,7 @@ fun VinylDisk(
     song: Song,
     bitmap: ImageBitmap?,
     playback: com.amply.mobile.domain.AmplyPlaybackState,
+    onScrub: (Long?) -> Unit,
     onSeek: (Long) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -343,12 +383,15 @@ fun VinylDisk(
                         scrubPositionMs = playback.positionMs
                     },
                     onDragEnd = {
+                        scrubPositionMs?.let(onSeek)
                         lastDragAngle = null
                         scrubPositionMs = null
+                        onScrub(null)
                     },
                     onDragCancel = {
                         lastDragAngle = null
                         scrubPositionMs = null
+                        onScrub(null)
                     },
                     onDrag = { change, _ ->
                         val duration = playback.durationMs
@@ -362,13 +405,14 @@ fun VinylDisk(
                             val base = scrubPositionMs ?: playback.positionMs
                             val nextPosition = (base + (delta / 360f * 20_000f).toLong()).coerceIn(0L, duration)
                             scrubPositionMs = nextPosition
-                            onSeek(nextPosition)
+                            onScrub(nextPosition)
                         }
                     },
                 )
             },
         contentAlignment = Alignment.Center,
     ) {
+        val ring = Palette.accent.copy(alpha = 0.18f)
         Canvas(Modifier.fillMaxSize()) {
             val radius = size.minDimension / 2f
             val center = Offset(size.width / 2f, size.height / 2f)
@@ -391,7 +435,7 @@ fun VinylDisk(
                 )
             }
             drawCircle(
-                color = AmplyOrange.copy(alpha = 0.18f),
+                color = ring,
                 radius = radius * 0.96f,
                 center = center,
                 style = Stroke(width = 2.dp.toPx()),
@@ -441,109 +485,31 @@ fun PlayerControls(
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        AmplyIconButton(Icons.Rounded.SkipPrevious, "Previous", onPrevious)
-        Spacer(Modifier.width(26.dp))
-        val scale by animateFloatAsState(if (isPlaying) 1.04f else 1f, label = "play-scale")
-        IconButton(
-            onClick = onPlayPause,
-            modifier = Modifier
-                .size(72.dp)
-                .graphicsLayer(scaleX = scale, scaleY = scale)
-                .clip(CircleShape)
-                .background(AmplyOrange),
-        ) {
-            Icon(
-                if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                contentDescription = "Play",
-                tint = Color(0xFF160B02),
-                modifier = Modifier.size(36.dp),
-            )
-        }
-        Spacer(Modifier.width(26.dp))
-        AmplyIconButton(Icons.Rounded.SkipNext, "Next", onNext)
+        NeuIconButton(Icons.Rounded.SkipPrevious, "Previous", onPrevious, size = 56.dp)
+        Spacer(Modifier.width(28.dp))
+        NeuIconButton(if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow, if (isPlaying) "Pause" else "Play", onPlayPause, size = 76.dp, accent = true)
+        Spacer(Modifier.width(28.dp))
+        NeuIconButton(Icons.Rounded.SkipNext, "Next", onNext, size = 56.dp)
     }
 }
 
 @Composable
-fun PlaybackModeOptions(
-    shuffle: Boolean,
-    repeatMode: RepeatMode,
-    onOrder: () -> Unit,
-    onShuffle: () -> Unit,
-    onLoopSong: () -> Unit,
+fun PlayerProgress(
+    playback: com.amply.mobile.domain.AmplyPlaybackState,
+    onSeek: (Long) -> Unit,
+    onScrub: (Long?) -> Unit = {},
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(28.dp))
-            .background(AmplyGlass.copy(alpha = 0.48f))
-            .padding(6.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        ModePill(
-            label = "In order",
-            icon = Icons.Rounded.Repeat,
-            selected = !shuffle,
-            modifier = Modifier.weight(1f),
-            onClick = onOrder,
-        )
-        ModePill(
-            label = "Shuffle",
-            icon = Icons.Rounded.Shuffle,
-            selected = shuffle,
-            modifier = Modifier.weight(1f),
-            onClick = onShuffle,
-        )
-        ModePill(
-            label = "Loop song",
-            icon = Icons.Rounded.Repeat,
-            selected = repeatMode == RepeatMode.One,
-            modifier = Modifier.weight(1f),
-            onClick = onLoopSong,
-        )
-    }
-}
-
-@Composable
-fun ModePill(
-    label: String,
-    icon: ImageVector,
-    selected: Boolean,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit,
-) {
-    val bg by animateColorAsState(if (selected) AmplyOrange else Color.Transparent, label = "mode-pill-bg")
-    val fg by animateColorAsState(if (selected) Color(0xFF160B02) else MaterialTheme.colorScheme.onSurface, label = "mode-pill-fg")
-    Row(
-        modifier = modifier
-            .clip(RoundedCornerShape(24.dp))
-            .background(bg)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 10.dp, vertical = 10.dp),
-        horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(icon, contentDescription = null, tint = fg, modifier = Modifier.size(18.dp))
-        Spacer(Modifier.width(6.dp))
-        Text(label, color = fg, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
-    }
-}
-
-@Composable
-fun PlayerProgress(playback: com.amply.mobile.domain.AmplyPlaybackState, onSeek: (Long) -> Unit) {
     val progress = if (playback.durationMs > 0L) {
         (playback.positionMs.toFloat() / playback.durationMs.toFloat()).coerceIn(0f, 1f)
     } else {
         0f
     }
+    val duration = playback.durationMs
     Column(Modifier.fillMaxWidth()) {
         MinimalProgressBar(
             progress = progress,
-            onSeekFraction = { fraction ->
-                val duration = playback.durationMs.takeIf { it > 0L } ?: return@MinimalProgressBar
-                onSeek((duration * fraction).toLong())
-            },
+            onScrubFraction = { fraction -> if (duration > 0L) onScrub(fraction?.let { (duration * it).toLong() }) },
+            onSeekFraction = { fraction -> if (duration > 0L) onSeek((duration * fraction).toLong()) },
         )
         Spacer(Modifier.height(8.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -553,37 +519,108 @@ fun PlayerProgress(playback: com.amply.mobile.domain.AmplyPlaybackState, onSeek:
     }
 }
 
+/** Tap to jump, or drag along the bar; the seek happens once, when the finger lifts. */
 @Composable
-fun MinimalProgressBar(progress: Float, onSeekFraction: (Float) -> Unit) {
+fun MinimalProgressBar(progress: Float, onSeekFraction: (Float) -> Unit, onScrubFraction: (Float?) -> Unit = {}) {
+    var dragFraction by remember { mutableStateOf<Float?>(null) }
+    val shownProgress = dragFraction ?: progress
+    val trackColor = Palette.textMuted.copy(alpha = 0.22f)
+    val fillColor = Palette.accent
     Canvas(
         modifier = Modifier
             .fillMaxWidth()
-            .height(18.dp)
+            .height(28.dp)
+            .semantics { progressBarRangeInfo = ProgressBarRangeInfo(progress, 0f..1f) }
             .pointerInput(Unit) {
                 detectTapGestures { offset ->
                     onSeekFraction((offset.x / size.width).coerceIn(0f, 1f))
                 }
+            }
+            .pointerInput(Unit) {
+                detectHorizontalDragGestures(
+                    onDragStart = { offset ->
+                        dragFraction = (offset.x / size.width).coerceIn(0f, 1f)
+                        onScrubFraction(dragFraction)
+                    },
+                    onDragEnd = {
+                        dragFraction?.let(onSeekFraction)
+                        dragFraction = null
+                        onScrubFraction(null)
+                    },
+                    onDragCancel = {
+                        dragFraction = null
+                        onScrubFraction(null)
+                    },
+                    onHorizontalDrag = { change, _ ->
+                        dragFraction = (change.position.x / size.width).coerceIn(0f, 1f)
+                        onScrubFraction(dragFraction)
+                    },
+                )
             },
     ) {
         val trackHeight = 3.dp.toPx()
         val y = size.height / 2f
+        val fraction = shownProgress.coerceIn(0f, 1f)
         drawRoundRect(
-            color = AmplyMuted.copy(alpha = 0.28f),
+            color = trackColor,
             topLeft = Offset(0f, y - trackHeight / 2f),
             size = Size(size.width, trackHeight),
             cornerRadius = androidx.compose.ui.geometry.CornerRadius(trackHeight, trackHeight),
         )
         drawRoundRect(
-            color = AmplyOrange,
+            color = fillColor,
             topLeft = Offset(0f, y - trackHeight / 2f),
-            size = Size(size.width * progress.coerceIn(0f, 1f), trackHeight),
+            size = Size(size.width * fraction, trackHeight),
             cornerRadius = androidx.compose.ui.geometry.CornerRadius(trackHeight, trackHeight),
         )
         drawCircle(
-            color = AmplyOrange,
-            radius = 4.dp.toPx(),
-            center = Offset(size.width * progress.coerceIn(0f, 1f), y),
+            color = fillColor,
+            radius = (if (dragFraction != null) 7 else 5).dp.toPx(),
+            center = Offset(size.width * fraction, y),
         )
+    }
+}
+
+/** Shuffle, repeat (off -> all -> one), sleep timer, queue and add-to-playlist. */
+@Composable
+fun PlayerTools(
+    shuffle: Boolean,
+    repeatMode: RepeatMode,
+    sleepLabel: String?,
+    queueCount: Int,
+    onShuffle: () -> Unit,
+    onRepeat: () -> Unit,
+    onSleep: () -> Unit,
+    onQueue: () -> Unit,
+    onAddToPlaylist: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .neuRaised(RadiusLg)
+            .padding(vertical = 6.dp),
+        horizontalArrangement = Arrangement.SpaceEvenly,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        PlayerToolButton(Icons.Rounded.Shuffle, if (shuffle) "Shuffle on" else "Shuffle", active = shuffle, onClick = onShuffle, badge = "Shuffle")
+        PlayerToolButton(
+            if (repeatMode == RepeatMode.One) Icons.Rounded.RepeatOne else Icons.Rounded.Repeat,
+            when (repeatMode) {
+                RepeatMode.Off -> "Repeat off"
+                RepeatMode.All -> "Repeat all"
+                RepeatMode.One -> "Repeat one"
+            },
+            active = repeatMode != RepeatMode.Off,
+            onClick = onRepeat,
+            badge = when (repeatMode) {
+                RepeatMode.Off -> "Repeat"
+                RepeatMode.All -> "All"
+                RepeatMode.One -> "One"
+            },
+        )
+        PlayerToolButton(Icons.Rounded.Bedtime, "Sleep timer", active = sleepLabel != null, onClick = onSleep, badge = sleepLabel?.substringBefore(" left") ?: "Sleep")
+        PlayerToolButton(Icons.AutoMirrored.Rounded.QueueMusic, "Up next", active = false, onClick = onQueue, badge = if (queueCount > 0) "$queueCount next" else "Queue")
+        PlayerToolButton(Icons.AutoMirrored.Rounded.PlaylistAdd, "Add to playlist", active = false, onClick = onAddToPlaylist, badge = "Save")
     }
 }
 
@@ -592,19 +629,17 @@ fun LyricsPreview(current: List<LyricPreviewLine>, busy: Boolean, onFetch: () ->
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(24.dp))
-            .background(AmplyGlass.copy(alpha = 0.45f))
-            .clickable(onClick = onOpen)
+            .neuPressed(RadiusLg, small = false)
+            .clip(RadiusLg)
+            .clickable(onClickLabel = "Open lyrics", onClick = onOpen)
             .padding(horizontal = 18.dp, vertical = 14.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         if (busy) {
-            LinearProgressIndicator(Modifier.fillMaxWidth(0.72f), color = AmplyOrange, trackColor = AmplyPanel)
+            LinearProgressIndicator(Modifier.fillMaxWidth(0.72f), color = Palette.accent, trackColor = Palette.bgDeep)
         } else if (current.isEmpty()) {
-            OutlinedButton(onClick = onFetch, border = BorderStroke(1.dp, AmplyGlass)) {
-                Text("Find lyrics")
-            }
+            NeuButton("Find lyrics", null, onFetch)
         } else {
             current.forEach { line ->
                 val scale by animateFloatAsState(if (line.active) 1f else 0.94f, animationSpec = tween(320), label = "preview-line-scale")
@@ -639,7 +674,7 @@ fun FullLyricsView(
     onNext: () -> Unit,
     onPrevious: () -> Unit,
 ) {
-    val parsed = lyrics?.raw?.let(::parseLrc).orEmpty()
+    val parsed = remember(lyrics?.raw) { lyrics?.raw?.let(::parseLrc).orEmpty() }
     val activeIndex = parsed.indexOfLast { it.timeMs != null && it.timeMs <= positionMs }.let { if (it >= 0) it else 0 }
     val listState = rememberLazyListState()
     LaunchedEffect(activeIndex, parsed.size) {
@@ -653,7 +688,7 @@ fun FullLyricsView(
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             Row(
-                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(30.dp)).background(AmplyGlass).padding(10.dp),
+                modifier = Modifier.fillMaxWidth().neuRaised(RadiusLg, NeuDepth.Raised).padding(10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 AmplyIconButton(Icons.AutoMirrored.Rounded.ArrowBack, "Back", onClick = onClose)
@@ -726,7 +761,7 @@ fun FullLyricsView(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 AmplyIconButton(Icons.Rounded.SkipPrevious, "Previous", onPrevious)
-                AmplyIconButton(if (playback.isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow, "Play", onPlayPause, highlight = true)
+                AmplyIconButton(if (playback.isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow, if (playback.isPlaying) "Pause" else "Play", onPlayPause, highlight = true)
                 AmplyIconButton(Icons.Rounded.SkipNext, "Next", onNext)
             }
         }
@@ -735,8 +770,7 @@ fun FullLyricsView(
 
 data class LyricPreviewLine(val text: String, val active: Boolean)
 
-fun currentLyricWindow(raw: String, positionMs: Long): List<LyricPreviewLine> {
-    val parsed = parseLrc(raw).filter { it.text.isNotBlank() }
+fun currentLyricWindow(parsed: List<com.amply.mobile.lyrics.LyricLine>, positionMs: Long): List<LyricPreviewLine> {
     if (parsed.isEmpty()) return emptyList()
     val active = parsed.indexOfLast { it.timeMs != null && it.timeMs <= positionMs }
         .takeIf { it >= 0 }

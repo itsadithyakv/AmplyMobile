@@ -15,6 +15,8 @@ import androidx.documentfile.provider.DocumentFile
 import androidx.room.withTransaction
 import com.amply.mobile.data.local.AmplyDatabase
 import com.amply.mobile.data.local.SongEntity
+import com.amply.mobile.data.local.deleteSongsByIdsChunked
+import com.amply.mobile.data.local.staleMediaStoreIds
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
@@ -102,11 +104,11 @@ class MusicScanner(
         }
 
         database.withTransaction {
-            if (songs.isEmpty() && canTrustEmptyMediaStoreScan()) {
-                database.songDao().deleteAllSongs()
-            } else if (songs.isNotEmpty()) {
-                database.songDao().upsertSongs(songs)
-                database.songDao().deleteSongsNotIn(songs.map { it.id })
+            val songDao = database.songDao()
+            if (songs.isNotEmpty() || canTrustEmptyMediaStoreScan()) {
+                if (songs.isNotEmpty()) songDao.upsertSongs(songs)
+                val stale = staleMediaStoreIds(songDao.allSongIds(), songs.mapTo(HashSet()) { it.id })
+                songDao.deleteSongsByIdsChunked(stale)
             }
         }
         songs.size
@@ -226,4 +228,6 @@ class MusicScanner(
     }
 }
 
-private fun String?.orUnknown(fallback: String): String = this?.trim()?.takeIf { it.isNotBlank() } ?: fallback
+/** MediaStore reports missing tags as the literal "<unknown>"; treat that like a blank tag. */
+private fun String?.orUnknown(fallback: String): String =
+    this?.trim()?.takeIf { it.isNotBlank() && !it.equals("<unknown>", ignoreCase = true) } ?: fallback

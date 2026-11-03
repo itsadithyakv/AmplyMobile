@@ -1,281 +1,268 @@
 package com.amply.mobile
 
-import android.Manifest
-import android.content.Context
-import android.content.Intent
-import android.content.pm.PackageManager
-import android.graphics.BitmapFactory
-import android.net.Uri
-import android.os.Build
-import android.os.Bundle
-import androidx.activity.ComponentActivity
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.compose.setContent
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.Crossfade
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.FolderOpen
-import androidx.compose.material.icons.rounded.GraphicEq
-import androidx.compose.material.icons.rounded.Home
-import androidx.compose.material.icons.rounded.LibraryMusic
 import androidx.compose.material.icons.rounded.MoreHoriz
+import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Refresh
-import androidx.compose.material.icons.rounded.Repeat
-import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Shuffle
 import androidx.compose.material.icons.rounded.SkipNext
-import androidx.compose.material.icons.rounded.SkipPrevious
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.Outline
-import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import androidx.lifecycle.viewmodel.compose.viewModel
-import com.amply.mobile.domain.CachedLyrics
+import com.amply.mobile.artwork.ArtworkLoader
 import com.amply.mobile.domain.Playlist
-import com.amply.mobile.domain.PlaylistType
-import com.amply.mobile.domain.RepeatMode
 import com.amply.mobile.domain.Song
-import com.amply.mobile.lyrics.parseLrc
-import com.amply.mobile.ui.theme.AmplyBg
-import com.amply.mobile.ui.theme.AmplyBgPurple
-import com.amply.mobile.ui.theme.AmplyBrand
-import com.amply.mobile.ui.theme.AmplyCard
-import com.amply.mobile.ui.theme.AmplyGlass
-import com.amply.mobile.ui.theme.AmplyLime
-import com.amply.mobile.ui.theme.AmplyMuted
-import com.amply.mobile.ui.theme.AmplyOrange
-import com.amply.mobile.ui.theme.AmplyPanel
-import com.amply.mobile.ui.theme.AmplyTheme
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import kotlin.math.PI
-import kotlin.math.abs
-import kotlin.math.atan2
-import kotlin.math.min
-import kotlin.math.roundToInt
+import com.amply.mobile.ui.theme.NeuDepth
+import com.amply.mobile.ui.theme.Palette
+import com.amply.mobile.ui.theme.neuAccent
+import com.amply.mobile.ui.theme.neuPressed
+import com.amply.mobile.ui.theme.neuRaised
 
+// Radii follow the desktop's four-step scale (--radius-sm/md/lg and full).
+val RadiusSm = RoundedCornerShape(10.dp)
+val RadiusMd = RoundedCornerShape(16.dp)
+val RadiusLg = RoundedCornerShape(24.dp)
 
+/** Now-playing strip above the tab bar, like the desktop player bar: raised, accent play button. */
 @Composable
-fun MiniPlayer(song: Song, isPlaying: Boolean, onOpen: () -> Unit, onPlayPause: () -> Unit) {
+fun MiniPlayer(
+    song: Song,
+    isPlaying: Boolean,
+    progress: Float,
+    onOpen: () -> Unit,
+    onPlayPause: () -> Unit,
+    onNext: () -> Unit,
+    onFavorite: () -> Unit,
+) {
+    val p = Palette
+    Column(Modifier.fillMaxWidth().clickable(onClickLabel = "Open now playing", onClick = onOpen)) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(start = 12.dp, end = 8.dp, top = 10.dp, bottom = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            ArtworkBox(song.artworkUri, 48.dp, shape = RadiusSm, audioUri = song.contentUri)
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(song.title, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.titleMedium)
+                Text(song.artist, maxLines = 1, overflow = TextOverflow.Ellipsis, color = p.textSecondary, style = MaterialTheme.typography.bodySmall)
+            }
+            NeuIconButton(
+                if (song.favorite) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
+                if (song.favorite) "Remove from liked songs" else "Add to liked songs",
+                onFavorite,
+                size = 40.dp,
+                flat = true,
+                tint = if (song.favorite) p.accent else p.textSecondary,
+            )
+            Spacer(Modifier.width(4.dp))
+            NeuIconButton(
+                if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                if (isPlaying) "Pause" else "Play",
+                onPlayPause,
+                size = 46.dp,
+                accent = true,
+            )
+            Spacer(Modifier.width(4.dp))
+            NeuIconButton(Icons.Rounded.SkipNext, "Next song", onNext, size = 40.dp, flat = true)
+        }
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+                .height(3.dp)
+                .clip(CircleShape)
+                .background(p.textMuted.copy(alpha = 0.18f)),
+        ) {
+            Box(Modifier.fillMaxWidth(progress.coerceIn(0f, 1f)).fillMaxHeight().background(p.accent))
+        }
+        Spacer(Modifier.height(6.dp))
+    }
+}
+
+/** A song row: cover, bold title, secondary artist, like and menu. The playing song is amber. */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+fun SongListRow(
+    song: Song,
+    onClick: () -> Unit,
+    onPlay: () -> Unit,
+    onFavorite: (() -> Unit)? = null,
+    onMore: (() -> Unit)? = null,
+    isCurrent: Boolean = false,
+) {
+    val p = Palette
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(76.dp)
-            .clip(RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp, bottomStart = 18.dp, bottomEnd = 18.dp))
-            .background(Color(0xFF111111))
-            .clickable(onClick = onOpen)
-            .padding(horizontal = 12.dp, vertical = 10.dp),
+            .then(if (isCurrent) Modifier.neuPressed(RadiusMd) else Modifier)
+            .clip(RadiusMd)
+            .combinedClickable(onClick = onClick, onLongClick = onMore, onLongClickLabel = "Song options")
+            .padding(horizontal = 8.dp, vertical = 7.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        ArtworkBox(song.artworkUri, 52.dp, shape = RoundedCornerShape(18.dp))
-        Spacer(Modifier.width(12.dp))
+        ArtworkBox(song.artworkUri, 50.dp, shape = RadiusSm, audioUri = song.contentUri)
+        Spacer(Modifier.width(14.dp))
         Column(Modifier.weight(1f)) {
-            Text(song.title, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Bold)
-            Text(song.artist, maxLines = 1, overflow = TextOverflow.Ellipsis, color = AmplyMuted, style = MaterialTheme.typography.bodySmall)
-        }
-        Icon(Icons.Rounded.FavoriteBorder, contentDescription = "Favorite", tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(26.dp))
-        Spacer(Modifier.width(12.dp))
-        IconButton(onClick = onPlayPause, modifier = Modifier.size(52.dp).clip(RoundedCornerShape(18.dp)).background(Color.White)) {
-            Icon(
-                if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                contentDescription = "Play",
-                tint = Color(0xFF101010),
-                modifier = Modifier.size(30.dp),
+            Text(
+                song.title,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                style = MaterialTheme.typography.titleMedium,
+                color = if (isCurrent) p.accent else p.textPrimary,
+            )
+            Text(
+                listOf(song.artist, song.album).filter { it.isNotBlank() && !it.startsWith("Unknown") }.joinToString("  ·  ").ifBlank { song.artist },
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                color = p.textSecondary,
+                style = MaterialTheme.typography.bodySmall,
             )
         }
-    }
-}
-
-@Composable
-fun SongListRow(song: Song, onClick: () -> Unit, onPlay: () -> Unit, onFavorite: (() -> Unit)? = null) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(22.dp))
-            .clickable(onClick = onClick)
-            .padding(vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        ArtworkBox(song.artworkUri, 62.dp, shape = RoundedCornerShape(18.dp))
-        Spacer(Modifier.width(14.dp))
-        Column(Modifier.weight(1f)) {
-            Text(song.title, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Black)
-            Text("${song.artist}  -  ${song.effectiveGenre}", maxLines = 1, overflow = TextOverflow.Ellipsis, color = AmplyMuted, style = MaterialTheme.typography.bodySmall)
-        }
         if (onFavorite != null) {
-            IconButton(onClick = onFavorite, modifier = Modifier.size(42.dp)) {
-                Icon(if (song.favorite) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder, contentDescription = "Favorite", tint = if (song.favorite) AmplyOrange else MaterialTheme.colorScheme.onSurface)
-            }
+            NeuIconButton(
+                if (song.favorite) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
+                if (song.favorite) "Remove from liked songs" else "Add to liked songs",
+                onFavorite,
+                size = 38.dp,
+                flat = true,
+                tint = if (song.favorite) p.accent else p.textMuted,
+            )
         }
-        IconButton(onClick = onPlay, modifier = Modifier.size(44.dp).clip(CircleShape).background(AmplyPanel)) {
-            Icon(Icons.Rounded.PlayArrow, contentDescription = "Play", modifier = Modifier.size(22.dp))
+        if (onMore != null) {
+            NeuIconButton(Icons.Rounded.MoreVert, "Song options", onMore, size = 38.dp, flat = true, tint = p.textMuted)
+        } else {
+            NeuIconButton(Icons.Rounded.PlayArrow, "Play ${song.title}", onPlay, size = 38.dp)
         }
     }
 }
 
 @Composable
-fun PlaylistListRow(playlist: Playlist, onClick: () -> Unit, onPlay: () -> Unit) {
+fun PlaylistListRow(playlist: Playlist, onClick: () -> Unit, onPlay: () -> Unit, artworkUri: String? = playlist.artworkUri) {
+    val p = Palette
     Row(
-        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).clickable(onClick = onClick).padding(vertical = 8.dp),
+        modifier = Modifier.fillMaxWidth().clip(RadiusMd).clickable(onClick = onClick).padding(horizontal = 8.dp, vertical = 7.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        ArtworkBox(playlist.artworkUri, 62.dp, shape = RoundedCornerShape(18.dp))
+        ArtworkBox(artworkUri, 50.dp, shape = RadiusSm)
         Spacer(Modifier.width(14.dp))
         Column(Modifier.weight(1f)) {
-            Text(playlist.name, fontWeight = FontWeight.Black, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text("${playlist.songIds.size} songs", color = AmplyMuted, style = MaterialTheme.typography.bodySmall)
+            Text(playlist.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text("${playlist.songIds.size} songs", color = p.textSecondary, style = MaterialTheme.typography.bodySmall)
         }
-        IconButton(onClick = onPlay, modifier = Modifier.size(44.dp).clip(CircleShape).background(AmplyPanel)) {
-            Icon(Icons.Rounded.PlayArrow, contentDescription = "Play")
-        }
+        NeuIconButton(Icons.Rounded.PlayArrow, "Play ${playlist.name}", onPlay, size = 38.dp)
     }
 }
 
 @Composable
 fun GenreRow(genre: String, count: Int, onClick: () -> Unit) {
+    val p = Palette
     Row(
-        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(AmplyCard).clickable(onClick = onClick).padding(16.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .neuRaised(RadiusMd)
+            .clip(RadiusMd)
+            .clickable(onClickLabel = "Play $genre", onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(Icons.Rounded.MusicNote, contentDescription = null, tint = AmplyOrange)
+        Icon(Icons.Rounded.MusicNote, contentDescription = null, tint = p.accent)
         Spacer(Modifier.width(14.dp))
-        Text(genre, fontWeight = FontWeight.Black, modifier = Modifier.weight(1f))
-        Text("$count", color = AmplyLime)
+        Text(genre, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+        Text("$count songs", color = p.textSecondary, style = MaterialTheme.typography.bodySmall)
     }
 }
 
 @Composable
 fun SectionTitle(text: String) {
-    Text(text, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black)
+    Text(text, style = MaterialTheme.typography.titleLarge)
+}
+
+/** Small uppercase label used above groups, like the desktop's "SONGS" / "SORT" captions. */
+@Composable
+fun Eyebrow(text: String, modifier: Modifier = Modifier) {
+    Text(
+        text.uppercase(),
+        modifier = modifier,
+        color = Palette.textMuted,
+        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, letterSpacing = MaterialTheme.typography.labelMedium.fontSize * 0.12f),
+    )
+}
+
+/** Raised panel: the desktop's `.neu-raised` card. */
+@Composable
+fun NeuCard(modifier: Modifier = Modifier, shape: Shape = RadiusLg, padding: Dp = 18.dp, content: @Composable () -> Unit) {
+    Box(modifier.fillMaxWidth().neuRaised(shape, NeuDepth.Raised).padding(padding)) { content() }
 }
 
 @Composable
 fun EmptyLibraryActions(onAddFolder: () -> Unit, onScan: () -> Unit) {
-    Card(
-        colors = CardDefaults.cardColors(containerColor = AmplyGlass),
-        shape = RoundedCornerShape(28.dp),
-    ) {
-        Column(
-            Modifier.fillMaxWidth().padding(22.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            AmplyLogo(Modifier.size(86.dp))
-            Text("No songs found", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black)
-            Text("Choose your music folder and Amply will scan it automatically.", color = AmplyMuted)
-            Button(
-                onClick = onAddFolder,
-                colors = ButtonDefaults.buttonColors(containerColor = AmplyLime, contentColor = Color(0xFF151801)),
-            ) {
-                Icon(Icons.Rounded.FolderOpen, contentDescription = null)
-                Spacer(Modifier.width(8.dp))
-                Text("Add folder")
+    val p = Palette
+    NeuCard {
+        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Box(Modifier.size(64.dp).neuPressed(CircleShape, small = false), contentAlignment = Alignment.Center) {
+                Icon(Icons.Rounded.MusicNote, contentDescription = null, tint = p.accent, modifier = Modifier.size(30.dp))
             }
-            OutlinedButton(onClick = onScan) {
-                Icon(Icons.Rounded.Refresh, contentDescription = null)
-                Spacer(Modifier.width(8.dp))
-                Text("Scan device")
+            Text("Your library is empty", style = MaterialTheme.typography.headlineSmall)
+            Text(
+                "Scan the music on this phone, or pick a folder and Amply will keep it in your library.",
+                color = p.textSecondary,
+                textAlign = TextAlign.Center,
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                NeuButton("Scan device", Icons.Rounded.Refresh, onScan, accent = true)
+                NeuButton("Add folder", Icons.Rounded.FolderOpen, onAddFolder)
             }
         }
     }
@@ -285,8 +272,8 @@ fun EmptyLibraryActions(onAddFolder: () -> Unit, onScan: () -> Unit) {
 fun OverflowActions(onAddFolder: () -> Unit, onScan: () -> Unit, onRefreshSmart: () -> Unit, onSettings: () -> Unit) {
     var open by remember { mutableStateOf(false) }
     Box {
-        AmplyIconButton(Icons.Rounded.MoreHoriz, "More", onClick = { open = true })
-        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+        NeuIconButton(Icons.Rounded.MoreHoriz, "More", onClick = { open = true })
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }, containerColor = Palette.bg) {
             DropdownMenuItem(text = { Text("Add folder") }, leadingIcon = { Icon(Icons.Rounded.FolderOpen, null) }, onClick = { open = false; onAddFolder() })
             DropdownMenuItem(text = { Text("Scan device") }, leadingIcon = { Icon(Icons.Rounded.Refresh, null) }, onClick = { open = false; onScan() })
             DropdownMenuItem(text = { Text("Refresh smart playlists") }, leadingIcon = { Icon(Icons.Rounded.Shuffle, null) }, onClick = { open = false; onRefreshSmart() })
@@ -299,29 +286,31 @@ fun OverflowActions(onAddFolder: () -> Unit, onScan: () -> Unit, onRefreshSmart:
 fun LibraryActions(onAddFolder: () -> Unit, onScan: () -> Unit) {
     var open by remember { mutableStateOf(false) }
     Box {
-        AmplyIconButton(Icons.Rounded.MoreHoriz, "Library actions", onClick = { open = true })
-        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+        NeuIconButton(Icons.Rounded.MoreHoriz, "Library actions", onClick = { open = true })
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }, containerColor = Palette.bg) {
             DropdownMenuItem(text = { Text("Add folder") }, leadingIcon = { Icon(Icons.Rounded.FolderOpen, null) }, onClick = { open = false; onAddFolder() })
             DropdownMenuItem(text = { Text("Scan device") }, leadingIcon = { Icon(Icons.Rounded.Refresh, null) }, onClick = { open = false; onScan() })
         }
     }
 }
 
+/** Filter pill: raised when idle, pressed in with amber text when selected (desktop tab pills). */
 @Composable
 fun AmplyChip(label: String, selected: Boolean, onClick: () -> Unit) {
-    val bg by animateColorAsState(if (selected) AmplyOrange else AmplyCard, label = "chip-bg")
-    val fg by animateColorAsState(if (selected) Color(0xFF160B02) else MaterialTheme.colorScheme.onSurface, label = "chip-fg")
+    val p = Palette
+    val shape = CircleShape
     Box(
         modifier = Modifier
-            .clip(RoundedCornerShape(24.dp))
-            .background(bg)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 20.dp, vertical = 12.dp),
+            .then(if (selected) Modifier.neuPressed(shape) else Modifier.neuRaised(shape))
+            .clip(shape)
+            .clickable(onClickLabel = label, onClick = onClick)
+            .padding(horizontal = 18.dp, vertical = 10.dp),
     ) {
-        Text(label, color = fg, fontWeight = FontWeight.Medium)
+        Text(label, color = if (selected) p.accent else p.textSecondary, style = MaterialTheme.typography.labelLarge)
     }
 }
 
+/** Kept for existing call sites: a round raised icon button, amber when highlighted or active. */
 @Composable
 fun AmplyIconButton(
     icon: ImageVector,
@@ -330,38 +319,97 @@ fun AmplyIconButton(
     highlight: Boolean = false,
     active: Boolean = false,
 ) {
-    val bg by animateColorAsState(
-        when {
-            highlight || active -> AmplyOrange
-            else -> AmplyCard
-        },
-        label = "icon-bg",
+    NeuIconButton(
+        icon,
+        contentDescription,
+        onClick,
+        accent = highlight,
+        pressed = active && !highlight,
+        tint = if (active && !highlight) Palette.accent else null,
     )
-    val fg by animateColorAsState(if (highlight || active) Color(0xFF160B02) else MaterialTheme.colorScheme.onSurface, label = "icon-fg")
-    IconButton(
-        onClick = onClick,
-        modifier = Modifier.size(48.dp).clip(CircleShape).background(bg),
+}
+
+/**
+ * Round icon button in the three desktop states: raised (default), pressed (on/selected) and accent
+ * (the main action). `flat` drops the surface for dense rows, where a field of raised circles is noise.
+ */
+@Composable
+fun NeuIconButton(
+    icon: ImageVector,
+    contentDescription: String,
+    onClick: () -> Unit,
+    size: Dp = 46.dp,
+    accent: Boolean = false,
+    pressed: Boolean = false,
+    flat: Boolean = false,
+    tint: androidx.compose.ui.graphics.Color? = null,
+) {
+    val p = Palette
+    val surface = when {
+        accent -> Modifier.neuAccent(CircleShape)
+        pressed -> Modifier.neuPressed(CircleShape)
+        flat -> Modifier
+        else -> Modifier.neuRaised(CircleShape)
+    }
+    Box(
+        modifier = Modifier
+            .size(size)
+            .then(surface)
+            .clip(CircleShape)
+            .clickable(onClickLabel = contentDescription, onClick = onClick),
+        contentAlignment = Alignment.Center,
     ) {
-        Icon(icon, contentDescription = contentDescription, tint = fg)
+        Icon(
+            icon,
+            contentDescription = contentDescription,
+            tint = tint ?: if (accent) p.onAccent else p.textPrimary,
+            modifier = Modifier.size(size * 0.48f),
+        )
     }
 }
 
+/** Text button with an optional icon, raised or amber. */
+@Composable
+fun NeuButton(label: String, icon: ImageVector?, onClick: () -> Unit, accent: Boolean = false, modifier: Modifier = Modifier) {
+    val p = Palette
+    val shape = CircleShape
+    Row(
+        modifier = modifier
+            .then(if (accent) Modifier.neuAccent(shape) else Modifier.neuRaised(shape))
+            .clip(shape)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 18.dp, vertical = 11.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (icon != null) {
+            Icon(icon, contentDescription = null, tint = if (accent) p.onAccent else p.textPrimary, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+        }
+        Text(label, color = if (accent) p.onAccent else p.textPrimary, style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold))
+    }
+}
+
+/** Cover art, or (like desktop 1.8.1) a quiet music note instead of the logo when there is none. */
 @Composable
 fun ArtworkBox(
     artworkUri: String?,
     size: Dp,
     modifier: Modifier = Modifier,
-    shape: androidx.compose.ui.graphics.Shape = RoundedCornerShape(18.dp),
+    shape: Shape = RadiusSm,
+    audioUri: String? = null,
 ) {
-    val bitmap by rememberArtwork(artworkUri)
+    val p = Palette
+    val sizePx = with(LocalDensity.current) { size.roundToPx() }
+    val bitmap by rememberArtwork(artworkUri, sizePx, audioUri)
     Box(
-        modifier = modifier.size(size).aspectRatio(1f).clip(shape).background(AmplyPanel),
+        modifier = modifier.size(size).aspectRatio(1f).clip(shape).background(p.bgDeep),
         contentAlignment = Alignment.Center,
     ) {
-        if (bitmap != null) {
-            Image(bitmap = bitmap!!, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+        val image = bitmap
+        if (image != null) {
+            Image(bitmap = image, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
         } else {
-            AmplyLogo(Modifier.fillMaxSize().padding(size * 0.18f))
+            Icon(Icons.Rounded.MusicNote, contentDescription = null, tint = p.textMuted.copy(alpha = 0.7f), modifier = Modifier.size(size * 0.4f))
         }
     }
 }
@@ -376,20 +424,17 @@ fun AmplyLogo(modifier: Modifier = Modifier) {
     )
 }
 
+/**
+ * Cover art for [uri], decoded at about [sizePx] and shared through [ArtworkLoader]'s memory cache.
+ * [audioUri] lets songs without an album-art uri fall back to the picture embedded in the file.
+ */
 @Composable
-fun rememberArtwork(uri: String?): androidx.compose.runtime.State<ImageBitmap?> {
+fun rememberArtwork(uri: String?, sizePx: Int = 256, audioUri: String? = null): androidx.compose.runtime.State<ImageBitmap?> {
     val context = LocalContext.current
-    return produceState<ImageBitmap?>(initialValue = null, uri) {
-        value = withContext(Dispatchers.IO) {
-            runCatching {
-                if (uri == null) {
-                    null
-                } else {
-                    context.contentResolver.openInputStream(Uri.parse(uri)).use { stream ->
-                        BitmapFactory.decodeStream(stream)?.asImageBitmap()
-                    }
-                }
-            }.getOrNull()
+    val initial = remember(uri, audioUri, sizePx) { ArtworkLoader.cached(uri ?: audioUri, sizePx)?.asImageBitmap() }
+    return produceState(initialValue = initial, uri, audioUri, sizePx) {
+        if (value == null) {
+            value = ArtworkLoader.load(context.applicationContext, uri, sizePx, audioUri)?.asImageBitmap()
         }
     }
 }
@@ -400,4 +445,3 @@ fun formatTime(ms: Long): String {
     val seconds = totalSeconds % 60L
     return "%d:%02d".format(minutes, seconds)
 }
-

@@ -26,6 +26,10 @@ class SettingsRepository(
             eqBass = values["eqBass"]?.toFloatOrNull()?.coerceIn(0f, 1f) ?: 0.50f,
             eqMid = values["eqMid"]?.toFloatOrNull()?.coerceIn(0f, 1f) ?: 0.50f,
             eqTreble = values["eqTreble"]?.toFloatOrNull()?.coerceIn(0f, 1f) ?: 0.50f,
+            eqPresetName = if ("eqPreset" in values) values["eqPreset"]?.takeIf { it.isNotBlank() } else "Flat",
+            accent = values["accent"] ?: "amber",
+            trueBlack = values["trueBlack"]?.toBooleanStrictOrNull() ?: false,
+            debugPro = values["debugPro"]?.toBooleanStrictOrNull() ?: false,
         )
     }
 
@@ -45,24 +49,50 @@ class SettingsRepository(
     }
 
     suspend fun setGaplessPlayback(enabled: Boolean) {
-        prefs.edit().putBoolean("gaplessPlayback", enabled).apply()
         settingsDao.upsert(SettingEntity("gaplessPlayback", enabled.toString()))
     }
 
     suspend fun setCrossfadeSeconds(seconds: Float) {
         val clamped = seconds.coerceIn(0f, 12f)
-        prefs.edit().putFloat("crossfadeSeconds", clamped).apply()
         settingsDao.upsert(SettingEntity("crossfadeSeconds", clamped.toString()))
     }
 
     suspend fun setEqualizerEnabled(enabled: Boolean) {
-        prefs.edit().putBoolean("equalizerEnabled", enabled).apply()
         settingsDao.upsert(SettingEntity("equalizerEnabled", enabled.toString()))
     }
 
     suspend fun setEqBand(key: String, value: Float) {
         val clamped = value.coerceIn(0f, 1f)
-        prefs.edit().putFloat(key, clamped).apply()
         settingsDao.upsert(SettingEntity(key, clamped.toString()))
+    }
+
+    suspend fun setEqPreset(name: String?) {
+        settingsDao.upsert(SettingEntity("eqPreset", name.orEmpty()))
+    }
+
+    suspend fun setAccent(key: String) {
+        settingsDao.upsert(SettingEntity("accent", key))
+    }
+
+    suspend fun setTrueBlack(enabled: Boolean) {
+        settingsDao.upsert(SettingEntity("trueBlack", enabled.toString()))
+    }
+
+    suspend fun setDebugPro(enabled: Boolean) {
+        settingsDao.upsert(SettingEntity("debugPro", enabled.toString()))
+    }
+
+    /**
+     * The playback service reads SharedPreferences, so it gets the *effective* values (what the
+     * current plan allows) while Room keeps what the user chose.
+     */
+    fun mirrorEffective(effective: AppSettings) {
+        prefs.edit()
+            .putFloat("crossfadeSeconds", effective.crossfadeSeconds)
+            .putBoolean("equalizerEnabled", effective.equalizerEnabled)
+            .putFloat("eqBass", effective.eqBass)
+            .putFloat("eqMid", effective.eqMid)
+            .putFloat("eqTreble", effective.eqTreble)
+            .apply()
     }
 }

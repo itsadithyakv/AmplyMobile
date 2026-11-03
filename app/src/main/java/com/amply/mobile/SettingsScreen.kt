@@ -97,6 +97,29 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.foundation.border
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.rememberCoroutineScope
+import com.amply.mobile.pro.AccentColor
+import com.amply.mobile.pro.PRO_EQ_PRESETS
+import com.amply.mobile.pro.ProFeature
+import com.amply.mobile.report.BugReporter
+import com.amply.mobile.report.ReportDraft
+import com.amply.mobile.report.ReportKind
+import com.amply.mobile.report.ReportResult
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import com.amply.mobile.ui.theme.NeuDepth
+import com.amply.mobile.ui.theme.Palette
+import com.amply.mobile.ui.theme.neuPressed
+import com.amply.mobile.ui.theme.neuRaised
+import com.amply.mobile.ui.theme.neuAccent
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -158,18 +181,39 @@ import kotlin.math.roundToInt
 
 @Composable
 fun SettingsScreen(viewModel: MainViewModel, onBack: () -> Unit) {
-    val settings by viewModel.settings.collectAsStateWithLifecycle()
+    val saved by viewModel.settings.collectAsStateWithLifecycle()
+    // Pro-only values show what is actually in effect on this plan; the saved choice comes back with Pro.
+    val settings by viewModel.effectiveSettings.collectAsStateWithLifecycle()
+    val isPro by viewModel.isPro.collectAsStateWithLifecycle()
+    val pro by viewModel.proState.collectAsStateWithLifecycle()
     var equalizerOpen by remember { mutableStateOf(false) }
+    var reportOpen by remember { mutableStateOf(false) }
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = 22.dp, end = 22.dp, top = 24.dp, bottom = 118.dp),
+        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
         item {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 AmplyIconButton(Icons.AutoMirrored.Rounded.ArrowBack, "Back", onBack)
                 Spacer(Modifier.width(12.dp))
-                Text("Settings", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Black)
+                Text("Settings", style = MaterialTheme.typography.headlineLarge)
+            }
+        }
+        item { PlanCard(isPro = isPro, price = pro.price, onUpgrade = { viewModel.showPaywall(ProFeature.Themes) }, onRestore = viewModel::restorePro) }
+        item {
+            SettingsGroup("Appearance") {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Accent colour", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                    if (!isPro) ProLock()
+                }
+                AccentPicker(selected = settings.accent, onPick = viewModel::setAccent)
+                SettingRow(
+                    "True black",
+                    if (isPro) "Pure black dark mode for OLED screens" else "Pure black dark mode for OLED screens (Pro)",
+                    settings.trueBlack,
+                    viewModel::setTrueBlack,
+                )
             }
         }
         item {
@@ -177,6 +221,7 @@ fun SettingsScreen(viewModel: MainViewModel, onBack: () -> Unit) {
                 CrossfadeSetting(
                     seconds = settings.crossfadeSeconds,
                     onSeconds = viewModel::setCrossfadeSeconds,
+                    locked = !isPro,
                 )
                 EqualizerSettingRow(
                     enabled = settings.equalizerEnabled,
@@ -190,13 +235,33 @@ fun SettingsScreen(viewModel: MainViewModel, onBack: () -> Unit) {
         item {
             SettingsGroup("Library intelligence") {
                 SettingRow("Pause metadata fetching", "Stop online artist and genre lookups", settings.metadataFetchPaused, viewModel::setMetadataPaused)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Mix tuning", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                    if (!isPro) ProLock()
+                }
                 SettingSlider("Discovery", settings.discoveryIntensity, viewModel::setDiscovery)
                 SettingSlider("Randomness", settings.randomnessIntensity, viewModel::setRandomness)
-                Button(onClick = viewModel::fetchAllMetadata, colors = ButtonDefaults.buttonColors(containerColor = AmplyOrange)) {
-                    Text("Fetch all metadata")
+                NeuButton("Fetch all metadata", null, viewModel::fetchAllMetadata)
+            }
+        }
+        item {
+            SettingsGroup("About") {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("App version", style = MaterialTheme.typography.titleMedium)
+                        Text("Amply ${BuildConfig.VERSION_NAME} for Android", color = Palette.textSecondary, style = MaterialTheme.typography.bodySmall)
+                    }
+                    PlanBadge(isPro)
+                }
+                NeuButton("Report a problem", null, { reportOpen = true })
+                if (BuildConfig.DEBUG) {
+                    SettingRow("Pretend Pro (debug build)", "Unlocks Pro features to test them without Google Play", saved.debugPro, viewModel::setDebugPro)
                 }
             }
         }
+    }
+    if (reportOpen) {
+        BugReportDialog(viewModel = viewModel, onDismiss = { reportOpen = false })
     }
     if (equalizerOpen) {
         EqualizerDialog(
@@ -205,9 +270,19 @@ fun SettingsScreen(viewModel: MainViewModel, onBack: () -> Unit) {
             mid = settings.eqMid,
             treble = settings.eqTreble,
             onEnabled = viewModel::setEqualizerEnabled,
-            onBass = viewModel::setEqBass,
-            onMid = viewModel::setEqMid,
-            onTreble = viewModel::setEqTreble,
+            onBass = { v -> viewModel.requirePro(ProFeature.Equalizer) { viewModel.setEqPreset(null); viewModel.setEqBass(v) } },
+            onMid = { v -> viewModel.requirePro(ProFeature.Equalizer) { viewModel.setEqPreset(null); viewModel.setEqMid(v) } },
+            onTreble = { v -> viewModel.requirePro(ProFeature.Equalizer) { viewModel.setEqPreset(null); viewModel.setEqTreble(v) } },
+            onPreset = { preset ->
+                val apply = {
+                    if (!settings.equalizerEnabled) viewModel.setEqualizerEnabled(true)
+                    viewModel.setEqPreset(preset.name)
+                    viewModel.setEqBass(preset.bass)
+                    viewModel.setEqMid(preset.mid)
+                    viewModel.setEqTreble(preset.treble)
+                }
+                if (preset.name in PRO_EQ_PRESETS) viewModel.requirePro(ProFeature.Equalizer, apply) else apply()
+            },
             onDismiss = { equalizerOpen = false },
         )
     }
@@ -215,9 +290,12 @@ fun SettingsScreen(viewModel: MainViewModel, onBack: () -> Unit) {
 
 @Composable
 fun SettingsGroup(title: String, content: @Composable ColumnScope.() -> Unit) {
-    Card(colors = CardDefaults.cardColors(containerColor = AmplyGlass), shape = RoundedCornerShape(26.dp)) {
-        Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black)
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Eyebrow(title, Modifier.padding(start = 6.dp))
+        Column(
+            Modifier.fillMaxWidth().neuRaised(RadiusLg, NeuDepth.Raised).padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
             content()
         }
     }
@@ -227,34 +305,26 @@ fun SettingsGroup(title: String, content: @Composable ColumnScope.() -> Unit) {
 fun SettingRow(title: String, description: String, checked: Boolean, onChecked: (Boolean) -> Unit) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
-            Text(title, fontWeight = FontWeight.Black)
-            Text(description, color = AmplyMuted, style = MaterialTheme.typography.bodySmall)
+            Text(title, style = MaterialTheme.typography.titleMedium)
+            Text(description, color = Palette.textSecondary, style = MaterialTheme.typography.bodySmall)
         }
-        val track by animateColorAsState(if (checked) AmplyOrange else Color(0xFF3A3A3A), label = "switch-track")
-        Box(
-            modifier = Modifier
-                .size(width = 58.dp, height = 34.dp)
-                .clip(RoundedCornerShape(18.dp))
-                .background(track)
-                .clickable { onChecked(!checked) }
-                .padding(4.dp),
-            contentAlignment = if (checked) Alignment.CenterEnd else Alignment.CenterStart,
-        ) {
-            Box(Modifier.size(26.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.92f)))
-        }
+        NeuSwitch(checked = checked, onChecked = onChecked, label = title)
     }
 }
 
 @Composable
 fun SettingSlider(title: String, value: Float, onValue: (Float) -> Unit) {
+    // Commit on release: each commit is a database write and regenerates nothing until then anyway.
+    var local by remember(value) { mutableFloatStateOf(value) }
     Column {
         Text(title, fontWeight = FontWeight.Bold)
         Slider(
-            value = value,
-            onValueChange = onValue,
+            value = local,
+            onValueChange = { local = it },
+            onValueChangeFinished = { onValue(local) },
             colors = SliderDefaults.colors(
-                thumbColor = AmplyOrange,
-                activeTrackColor = AmplyOrange,
+                thumbColor = Palette.accent,
+                activeTrackColor = Palette.accent,
                 inactiveTrackColor = AmplyMuted.copy(alpha = 0.28f),
             ),
         )
@@ -262,27 +332,30 @@ fun SettingSlider(title: String, value: Float, onValue: (Float) -> Unit) {
 }
 
 @Composable
-fun CrossfadeSetting(seconds: Float, onSeconds: (Float) -> Unit) {
+fun CrossfadeSetting(seconds: Float, onSeconds: (Float) -> Unit, locked: Boolean = false) {
+    var local by remember(seconds) { mutableFloatStateOf(seconds) }
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text("Crossfade / gapless", fontWeight = FontWeight.Black)
+                Text("Fade between songs", fontWeight = FontWeight.Black)
                 Text(
-                    if (seconds <= 0.1f) "0s - normal gapless playback" else "${seconds.roundToInt()}s transition between songs",
+                    if (local <= 0.1f) "Off - songs play back to back (gapless)" else "Fades out the last ${local.roundToInt()}s of a song and fades the next one in",
                     color = AmplyMuted,
                     style = MaterialTheme.typography.bodySmall,
                 )
             }
-            Text("${seconds.roundToInt()}s", color = AmplyOrange, fontWeight = FontWeight.Black)
+            if (locked) ProLock(Modifier.padding(end = 6.dp))
+            Text("${local.roundToInt()}s", color = Palette.accent, fontWeight = FontWeight.Black)
         }
         Slider(
-            value = seconds.coerceIn(0f, 12f),
-            onValueChange = onSeconds,
+            value = local.coerceIn(0f, 12f),
+            onValueChange = { local = it },
+            onValueChangeFinished = { onSeconds(local) },
             valueRange = 0f..12f,
             steps = 11,
             colors = SliderDefaults.colors(
-                thumbColor = AmplyOrange,
-                activeTrackColor = AmplyOrange,
+                thumbColor = Palette.accent,
+                activeTrackColor = Palette.accent,
                 inactiveTrackColor = AmplyMuted.copy(alpha = 0.28f),
             ),
         )
@@ -300,14 +373,13 @@ fun EqualizerSettingRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(22.dp))
-            .background(AmplyPanel)
-            .clickable(onClick = onOpen)
-            .padding(14.dp),
+            .clip(RadiusMd)
+            .clickable(onClickLabel = "Open equalizer", onClick = onOpen)
+            .padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text("Equalizer", fontWeight = FontWeight.Black)
+            Text("Equalizer", style = MaterialTheme.typography.titleMedium)
             Text(
                 if (enabled) "Bass ${eqDbLabel(bass)}  -  Mid ${eqDbLabel(mid)}  -  High ${eqDbLabel(treble)}" else "Off - tap to tune bass, mids, and treble",
                 color = AmplyMuted,
@@ -316,12 +388,7 @@ fun EqualizerSettingRow(
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        Box(
-            modifier = Modifier.size(width = 58.dp, height = 34.dp).clip(RoundedCornerShape(18.dp)).background(if (enabled) AmplyOrange else Color(0xFF3A3A3A)),
-            contentAlignment = if (enabled) Alignment.CenterEnd else Alignment.CenterStart,
-        ) {
-            Box(Modifier.padding(4.dp).size(26.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.94f)))
-        }
+        Text(if (enabled) "On" else "Off", color = if (enabled) Palette.accent else Palette.textMuted, style = MaterialTheme.typography.labelLarge)
     }
 }
 
@@ -336,11 +403,12 @@ fun EqualizerDialog(
     onMid: (Float) -> Unit,
     onTreble: (Float) -> Unit,
     onDismiss: () -> Unit,
+    onPreset: (EqPreset) -> Unit,
 ) {
     Dialog(onDismissRequest = onDismiss) {
         Card(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF101010)),
+            colors = CardDefaults.cardColors(containerColor = Palette.bg),
             shape = RoundedCornerShape(34.dp),
         ) {
             Column(
@@ -365,12 +433,7 @@ fun EqualizerDialog(
                 EqPresetSelector(
                     presets = EqPreset.defaults,
                     current = EqPreset.match(bass, mid, treble),
-                    onPreset = { preset ->
-                        if (!enabled) onEnabled(true)
-                        onBass(preset.bass)
-                        onMid(preset.mid)
-                        onTreble(preset.treble)
-                    },
+                    onPreset = onPreset,
                 )
             }
         }
@@ -382,14 +445,14 @@ fun EqPowerSwitch(enabled: Boolean, onToggle: () -> Unit) {
     Row(
         modifier = Modifier
             .clip(RoundedCornerShape(18.dp))
-            .background(if (enabled) AmplyOrange else AmplyPanel)
+            .then(if (enabled) Modifier.neuAccent(RoundedCornerShape(18.dp)) else Modifier.neuPressed(RoundedCornerShape(18.dp)))
             .clickable(onClick = onToggle)
             .padding(start = 12.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text(if (enabled) "ON" else "OFF", color = if (enabled) Color(0xFF160B02) else AmplyMuted, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Black)
-        Box(Modifier.size(10.dp).clip(CircleShape).background(if (enabled) Color(0xFF160B02) else AmplyMuted))
+        Text(if (enabled) "ON" else "OFF", color = if (enabled) Palette.onAccent else Palette.textSecondary, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Black)
+        Box(Modifier.size(10.dp).clip(CircleShape).background(if (enabled) Palette.onAccent else Palette.textSecondary))
     }
 }
 
@@ -413,7 +476,7 @@ fun EditableEqGraph(
                 .fillMaxWidth()
                 .height(238.dp)
                 .clip(RoundedCornerShape(28.dp))
-                .background(AmplyPanel)
+                .neuPressed(RoundedCornerShape(28.dp), small = false)
                 .pointerInput(enabled) {
                     detectTapGestures { offset ->
                         if (enabled) updateEqPoint(offset, size.width.toFloat(), size.height.toFloat(), onBass, onMid, onTreble)
@@ -426,6 +489,9 @@ fun EditableEqGraph(
                 }
                 .padding(14.dp),
         ) {
+            val muted = Palette.textMuted
+            val knobRing = Palette.bg
+            val accent = Palette.accent
             Canvas(Modifier.fillMaxSize()) {
                 val left = 26.dp.toPx()
                 val right = size.width - 26.dp.toPx()
@@ -438,7 +504,7 @@ fun EditableEqGraph(
                 listOf(0f, 0.25f, 0.5f, 0.75f, 1f).forEach { fraction ->
                     val y = bottom - (bottom - top) * fraction
                     drawLine(
-                        color = if (fraction == 0.5f) AmplyMuted.copy(alpha = 0.34f) else AmplyMuted.copy(alpha = 0.14f),
+                        color = if (fraction == 0.5f) muted.copy(alpha = 0.34f) else muted.copy(alpha = 0.14f),
                         start = Offset(left, y),
                         end = Offset(right, y),
                         strokeWidth = if (fraction == 0.5f) 2.dp.toPx() else 1.dp.toPx(),
@@ -447,7 +513,7 @@ fun EditableEqGraph(
 
                 xs.forEach { x ->
                     drawLine(
-                        color = AmplyMuted.copy(alpha = 0.12f),
+                        color = muted.copy(alpha = 0.12f),
                         start = Offset(x, top),
                         end = Offset(x, bottom),
                         strokeWidth = 1.dp.toPx(),
@@ -475,12 +541,12 @@ fun EditableEqGraph(
                 }
                 drawPath(
                     path = path,
-                    color = if (enabled) AmplyOrange else AmplyMuted.copy(alpha = 0.40f),
+                    color = if (enabled) accent else muted.copy(alpha = 0.40f),
                     style = Stroke(width = 5.dp.toPx()),
                 )
                 points.forEach { point ->
-                    drawCircle(Color(0xFF0C0C0C), radius = 19.dp.toPx(), center = point)
-                    drawCircle(if (enabled) AmplyOrange else AmplyMuted, radius = 13.dp.toPx(), center = point)
+                    drawCircle(knobRing, radius = 19.dp.toPx(), center = point)
+                    drawCircle(if (enabled) accent else muted, radius = 13.dp.toPx(), center = point)
                 }
             }
         }
@@ -525,19 +591,19 @@ fun updateEqPoint(
 fun EqPresetSelector(presets: List<EqPreset>, current: String?, onPreset: (EqPreset) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text("Templates", color = AmplyMuted, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp), contentPadding = PaddingValues(end = 8.dp)) {
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp), contentPadding = PaddingValues(vertical = 6.dp, horizontal = 4.dp)) {
             items(presets, key = { it.name }) { preset ->
                 val selected = current == preset.name
                 Box(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(if (selected) AmplyOrange else AmplyPanel)
+                        .then(if (selected) Modifier.neuPressed(CircleShape) else Modifier.neuRaised(CircleShape))
+                        .clip(CircleShape)
                         .clickable { onPreset(preset) }
                         .padding(horizontal = 18.dp, vertical = 12.dp),
                 ) {
                     Text(
                         preset.name,
-                        color = if (selected) Color(0xFF160B02) else MaterialTheme.colorScheme.onSurface,
+                        color = if (selected) Palette.accent else Palette.textSecondary,
                         fontWeight = FontWeight.Black,
                     )
                 }
@@ -554,6 +620,9 @@ data class EqPreset(val name: String, val bass: Float, val mid: Float, val trebl
             EqPreset("Vocal", 0.45f, 0.76f, 0.58f),
             EqPreset("Rock", 0.70f, 0.48f, 0.72f),
             EqPreset("Late Night", 0.38f, 0.45f, 0.42f),
+            // Pro presets, as on desktop.
+            EqPreset("Warm", 0.66f, 0.58f, 0.40f),
+            EqPreset("Club", 0.86f, 0.44f, 0.70f),
         )
 
         fun match(bass: Float, mid: Float, treble: Float): String? =
@@ -573,3 +642,149 @@ fun eqDbLabel(value: Float): String {
     }
 }
 
+/**
+ * Desktop switch: a pressed track with a raised knob. The thin outline keeps "off" readable, as
+ * the desktop 1.8.1 notes call out.
+ */
+@Composable
+fun NeuSwitch(checked: Boolean, onChecked: (Boolean) -> Unit, label: String) {
+    val p = Palette
+    val trackShape = CircleShape
+    Box(
+        modifier = Modifier
+            .size(width = 54.dp, height = 30.dp)
+            .neuPressed(trackShape)
+            .border(1.dp, p.edge, trackShape)
+            .clip(trackShape)
+            .background(if (checked) p.accent.copy(alpha = 0.9f) else Color.Transparent)
+            .toggleable(value = checked, role = androidx.compose.ui.semantics.Role.Switch, onValueChange = onChecked)
+            .semantics { contentDescription = label }
+            .padding(4.dp),
+        contentAlignment = if (checked) Alignment.CenterEnd else Alignment.CenterStart,
+    ) {
+        Box(Modifier.size(22.dp).neuRaised(CircleShape, color = if (checked) Color.White else p.bg))
+    }
+}
+
+/** Plan card at the top of Settings, like the desktop's. */
+@Composable
+private fun PlanCard(isPro: Boolean, price: String?, onUpgrade: () -> Unit, onRestore: () -> Unit) {
+    val p = Palette
+    Row(
+        Modifier.fillMaxWidth().neuRaised(RadiusLg, NeuDepth.Raised).padding(18.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Your plan", style = MaterialTheme.typography.titleMedium)
+                Spacer(Modifier.width(8.dp))
+                PlanBadge(isPro)
+            }
+            Text(
+                if (isPro) "Every Amply Pro feature is on. Thank you!" else "Amply is free. Pro is a one-time purchase${price?.let { " of $it" } ?: ""}.",
+                color = p.textSecondary,
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+        if (!isPro) {
+            Column(horizontalAlignment = Alignment.End) {
+                NeuButton("Get Pro", null, onUpgrade, accent = true)
+                TextButton(onClick = onRestore) { Text("Restore", color = p.textSecondary, style = MaterialTheme.typography.labelMedium) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AccentPicker(selected: String, onPick: (String) -> Unit) {
+    val dark = Palette.isDark
+    LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(vertical = 6.dp, horizontal = 4.dp)) {
+        items(AccentColor.entries) { accent ->
+            val chosen = accent.key == selected
+            Box(
+                Modifier
+                    .size(40.dp)
+                    .then(if (chosen) Modifier.neuPressed(CircleShape) else Modifier.neuRaised(CircleShape))
+                    .clip(CircleShape)
+                    .clickable(onClickLabel = accent.label) { onPick(accent.key) }
+                    .padding(7.dp)
+                    .background(Color(if (dark) accent.dark else accent.light), CircleShape),
+            )
+        }
+    }
+}
+
+/** Settings > About > Report a problem. Shows exactly what will be sent before sending. */
+@Composable
+private fun BugReportDialog(viewModel: MainViewModel, onDismiss: () -> Unit) {
+    val p = Palette
+    val scope = rememberCoroutineScope()
+    val songs by viewModel.songs.collectAsStateWithLifecycle()
+    val isPro by viewModel.isPro.collectAsStateWithLifecycle()
+    var kind by remember { mutableStateOf(ReportKind.Bug) }
+    var summary by remember { mutableStateOf("") }
+    var details by remember { mutableStateOf("") }
+    var steps by remember { mutableStateOf("") }
+    var email by remember { mutableStateOf("") }
+    var includeDetails by remember { mutableStateOf(true) }
+    var sending by remember { mutableStateOf(false) }
+    var result by remember { mutableStateOf<ReportResult?>(null) }
+    val draft = ReportDraft(kind, summary, details, steps, email, includeDetails)
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = p.bg,
+        title = { Text(if (result == ReportResult.Sent) "Thanks for the report" else "Report a problem") },
+        text = {
+            if (result == ReportResult.Sent) {
+                Text("It's on its way to the developer.${if (email.isNotBlank()) " You may get a reply at $email." else ""}", color = p.textSecondary)
+            } else {
+                Column(Modifier.heightIn(max = 520.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        ReportKind.entries.forEach { AmplyChip(it.subject, kind == it) { kind = it } }
+                    }
+                    NeuField(summary, { summary = it.take(120) }, "Short summary")
+                    NeuField(details, { details = it.take(4000) }, "What happened? What did you expect?", singleLine = false, minHeight = 96.dp)
+                    NeuField(steps, { steps = it.take(2000) }, "Steps to make it happen (optional)", singleLine = false)
+                    NeuField(email, { email = it.take(254) }, "Your email, if you'd like a reply (optional)")
+                    SettingRow("Include device details", "Shown below; nothing else is sent", includeDetails) { includeDetails = it }
+                    if (includeDetails) {
+                        Text(
+                            BugReporter.deviceDescription(songs.size, if (isPro) "Pro" else "Free"),
+                            color = p.textMuted,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                    result?.let {
+                        Text(
+                            when (it) {
+                                ReportResult.RateLimited -> "You've sent a report recently. Try again in a minute."
+                                ReportResult.Offline -> "You're offline. Connect and try again."
+                                ReportResult.Invalid -> "Add a short summary and a few words about what happened."
+                                else -> "The report couldn't be sent. Try again later."
+                            },
+                            color = p.danger,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            if (result == ReportResult.Sent) {
+                TextButton(onClick = onDismiss) { Text("Done") }
+            } else {
+                TextButton(
+                    enabled = !sending && BugReporter.isValid(draft),
+                    onClick = {
+                        sending = true
+                        scope.launch {
+                            result = viewModel.sendReport(draft)
+                            sending = false
+                        }
+                    },
+                ) { Text(if (sending) "Sending..." else "Send") }
+            }
+        },
+        dismissButton = { if (result != ReportResult.Sent) TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
+}

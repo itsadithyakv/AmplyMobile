@@ -114,6 +114,13 @@ data class AppSettings(
     val eqBass: Float = 0.50f,
     val eqMid: Float = 0.50f,
     val eqTreble: Float = 0.50f,
+    /** Name of the chosen equalizer preset, or null for a custom curve. */
+    val eqPresetName: String? = "Flat",
+    /** Accent key, see pro/ProFeatures.kt AccentColor. */
+    val accent: String = "amber",
+    val trueBlack: Boolean = false,
+    /** Debug builds only: pretend Amply Pro is owned, to test gated screens without Play. */
+    val debugPro: Boolean = false,
 )
 
 data class AmplyPlaybackState(
@@ -123,4 +130,13 @@ data class AmplyPlaybackState(
     val durationMs: Long = 0,
     val shuffle: Boolean = false,
     val repeatMode: RepeatMode = RepeatMode.Off,
+    /** Song ids in the order they will play (shuffle applied); -1 for files opened from other apps. */
+    val queue: List<Long> = emptyList(),
+    /** Player playlist index for each entry of [queue]. */
+    val queueIndices: List<Int> = emptyList(),
+    /** Position of the current song inside [queue], or -1. */
+    val queuePosition: Int = -1,
+    /** Title and artist of a file opened from another app, which has no library row. */
+    val externalTitle: String? = null,
+    val externalArtist: String? = null,
 )
