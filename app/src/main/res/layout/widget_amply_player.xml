@@ -1,26 +1,35 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<!-- Large widget: one desktop-style card, info stacked directly above the controls so it reads the
+     same at any height (the old FrameLayout pinned the halves to top and bottom and left a gap). -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:padding="8dp">
+    android:background="@drawable/bg_widget_large_back"
+    android:gravity="center_vertical"
+    android:orientation="vertical"
+    android:padding="14dp">
 
     <LinearLayout
         android:id="@+id/widget_info_card"
         android:layout_width="match_parent"
-        android:layout_height="120dp"
-        android:layout_gravity="top"
-        android:background="@drawable/bg_widget_large_back"
+        android:layout_height="wrap_content"
         android:gravity="center_vertical"
-        android:orientation="horizontal"
-        android:paddingStart="140dp"
-        android:paddingTop="18dp"
-        android:paddingEnd="24dp"
-        android:paddingBottom="34dp">
+        android:orientation="horizontal">
+
+        <ImageView
+            android:id="@+id/widget_artwork"
+            android:layout_width="76dp"
+            android:layout_height="76dp"
+            android:contentDescription="@null"
+            android:scaleType="centerCrop"
+            android:src="@drawable/ic_launcher_foreground" />
 
         <LinearLayout
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
+            android:layout_marginStart="14dp"
+            android:layout_weight="1"
             android:orientation="vertical">
 
             <TextView
@@ -28,11 +37,11 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:ellipsize="end"
-                android:fontFamily="@font/gilroy_bold"
+                android:fontFamily="@font/zt_nature_black"
                 android:maxLines="1"
                 android:text="@string/app_name"
-                android:textColor="#FFFFFFFF"
-                android:textSize="17sp" />
+                android:textColor="#FF231F1B"
+                android:textSize="18sp" />
 
             <TextView
                 android:id="@+id/widget_artist"
@@ -40,255 +49,211 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
                 android:ellipsize="end"
-                android:fontFamily="@font/gilroy_regular"
+                android:fontFamily="@font/zt_nature_medium"
                 android:maxLines="1"
                 android:text=""
-                android:textColor="#B8FFFFFF"
+                android:textColor="#FF544C43"
                 android:textSize="13sp" />
 
-            <FrameLayout
+            <ProgressBar
                 android:id="@+id/widget_progress"
+                style="@android:style/Widget.ProgressBar.Horizontal"
                 android:layout_width="match_parent"
-                android:layout_height="8dp"
-                android:layout_marginTop="16dp"
-                android:background="@drawable/bg_widget_progress_track">
-
-                <TextView
-                    android:layout_width="104dp"
-                    android:layout_height="match_parent"
-                    android:background="@drawable/bg_widget_progress_fill"
-                    android:text="" />
-            </FrameLayout>
+                android:layout_height="5dp"
+                android:layout_marginTop="12dp"
+                android:max="1000"
+                android:progress="0"
+                android:progressDrawable="@drawable/widget_progress" />
         </LinearLayout>
     </LinearLayout>
 
     <LinearLayout
         android:id="@+id/widget_control_tray"
         android:layout_width="match_parent"
-        android:layout_height="102dp"
-        android:layout_gravity="bottom"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
         android:background="@drawable/bg_widget_large_tray"
         android:baselineAligned="false"
         android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:paddingStart="18dp"
-        android:paddingTop="9dp"
-        android:paddingEnd="18dp"
-        android:paddingBottom="9dp">
+        android:padding="8dp">
 
-        <LinearLayout
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:gravity="center"
-            android:orientation="horizontal">
+        <ImageButton
+            android:id="@+id/widget_previous"
+            android:layout_width="40dp"
+            android:layout_height="44dp"
+            android:background="@android:color/transparent"
+            android:contentDescription="@string/widget_previous"
+            android:padding="10dp"
+            android:scaleType="centerInside"
+            android:src="@drawable/ic_amply_previous"
+            android:tint="#FF544C43" />
 
-            <ImageButton
-                android:id="@+id/widget_previous"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
-                android:background="@android:color/transparent"
-                android:contentDescription="@string/widget_previous"
-                android:padding="11dp"
-                android:scaleType="centerInside"
-                android:src="@drawable/ic_amply_previous"
-                android:tint="#FF77706A" />
+        <ImageButton
+            android:id="@+id/widget_play_pause"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_marginHorizontal="4dp"
+            android:background="@drawable/bg_widget_large_play"
+            android:contentDescription="@string/widget_play_pause"
+            android:padding="13dp"
+            android:scaleType="centerInside"
+            android:src="@drawable/ic_amply_play"
+            android:tint="#FF1C1610" />
 
-            <ImageButton
-                android:id="@+id/widget_play_pause"
-                android:layout_width="50dp"
-                android:layout_height="50dp"
-                android:layout_marginHorizontal="18dp"
-                android:background="@drawable/bg_widget_large_play"
-                android:contentDescription="@string/widget_play_pause"
-                android:padding="13dp"
-                android:scaleType="centerInside"
-                android:src="@drawable/ic_amply_play"
-                android:tint="#FF160B02" />
-
-            <ImageButton
-                android:id="@+id/widget_next"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
-                android:background="@android:color/transparent"
-                android:contentDescription="@string/widget_next"
-                android:padding="11dp"
-                android:scaleType="centerInside"
-                android:src="@drawable/ic_amply_next"
-                android:tint="#FF77706A" />
-        </LinearLayout>
+        <ImageButton
+            android:id="@+id/widget_next"
+            android:layout_width="40dp"
+            android:layout_height="44dp"
+            android:background="@android:color/transparent"
+            android:contentDescription="@string/widget_next"
+            android:padding="10dp"
+            android:scaleType="centerInside"
+            android:src="@drawable/ic_amply_next"
+            android:tint="#FF544C43" />
 
         <LinearLayout
             android:id="@+id/widget_playlist_row"
             android:layout_width="0dp"
-            android:layout_height="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
             android:layout_weight="1"
-            android:gravity="center"
-            android:orientation="vertical"
-            android:paddingStart="6dp">
+            android:orientation="vertical">
 
             <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="0dp"
-                android:layout_weight="1"
+                android:layout_height="34dp"
                 android:baselineAligned="false"
-                android:gravity="center"
                 android:orientation="horizontal">
 
-                <LinearLayout
-                    android:id="@+id/widget_playlist_1"
+            <LinearLayout
+                android:id="@+id/widget_playlist_1"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1" android:layout_marginEnd="6dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <ImageView
+                    android:id="@+id/widget_playlist_art_1"
+                    android:layout_width="30dp"
+                    android:layout_height="30dp"
+                    android:contentDescription="@null"
+                    android:scaleType="centerCrop"
+                    android:src="@drawable/ic_launcher_foreground" />
+
+                <TextView
+                    android:id="@+id/widget_playlist_label_1"
                     android:layout_width="0dp"
-                    android:layout_height="match_parent"
-                    android:layout_marginEnd="4dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="6dp"
                     android:layout_weight="1"
-                    android:gravity="center"
-                    android:orientation="horizontal">
+                    android:ellipsize="end"
+                    android:fontFamily="@font/zt_nature_bold"
+                    android:maxLines="1"
+                    android:text="@string/widget_mix"
+                    android:textColor="#FF231F1B"
+                    android:textSize="11sp" />
+            </LinearLayout>
 
-                    <ImageView
-                        android:id="@+id/widget_playlist_art_1"
-                        android:layout_width="28dp"
-                        android:layout_height="28dp"
-                        android:background="@drawable/bg_widget_artwork_small"
-                        android:clipToOutline="true"
-                        android:contentDescription="@null"
-                        android:scaleType="centerCrop"
-                        android:src="@drawable/ic_launcher_foreground" />
+            <LinearLayout
+                android:id="@+id/widget_playlist_2"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
 
-                    <TextView
-                        android:id="@+id/widget_playlist_label_1"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="4dp"
-                        android:layout_weight="1"
-                        android:ellipsize="end"
-                        android:fontFamily="@font/gilroy_bold"
-                        android:maxLines="1"
-                        android:text="@string/widget_mix"
-                        android:textColor="#FF181A1D"
-                        android:textSize="8sp" />
-                </LinearLayout>
+                <ImageView
+                    android:id="@+id/widget_playlist_art_2"
+                    android:layout_width="30dp"
+                    android:layout_height="30dp"
+                    android:contentDescription="@null"
+                    android:scaleType="centerCrop"
+                    android:src="@drawable/ic_launcher_foreground" />
 
-                <LinearLayout
-                    android:id="@+id/widget_playlist_2"
+                <TextView
+                    android:id="@+id/widget_playlist_label_2"
                     android:layout_width="0dp"
-                    android:layout_height="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="6dp"
                     android:layout_weight="1"
-                    android:gravity="center"
-                    android:orientation="horizontal">
-
-                    <ImageView
-                        android:id="@+id/widget_playlist_art_2"
-                        android:layout_width="28dp"
-                        android:layout_height="28dp"
-                        android:background="@drawable/bg_widget_artwork_small"
-                        android:clipToOutline="true"
-                        android:contentDescription="@null"
-                        android:scaleType="centerCrop"
-                        android:src="@drawable/ic_launcher_foreground" />
-
-                    <TextView
-                        android:id="@+id/widget_playlist_label_2"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="4dp"
-                        android:layout_weight="1"
-                        android:ellipsize="end"
-                        android:fontFamily="@font/gilroy_bold"
-                        android:maxLines="1"
-                        android:text="@string/widget_mix"
-                        android:textColor="#FF181A1D"
-                        android:textSize="8sp" />
-                </LinearLayout>
+                    android:ellipsize="end"
+                    android:fontFamily="@font/zt_nature_bold"
+                    android:maxLines="1"
+                    android:text="@string/widget_mix"
+                    android:textColor="#FF231F1B"
+                    android:textSize="11sp" />
+            </LinearLayout>
             </LinearLayout>
 
             <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="0dp"
-                android:layout_marginTop="2dp"
-                android:layout_weight="1"
+                android:layout_height="34dp"
+                android:layout_marginTop="4dp"
                 android:baselineAligned="false"
-                android:gravity="center"
                 android:orientation="horizontal">
 
-                <LinearLayout
-                    android:id="@+id/widget_playlist_3"
+            <LinearLayout
+                android:id="@+id/widget_playlist_3"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1" android:layout_marginEnd="6dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <ImageView
+                    android:id="@+id/widget_playlist_art_3"
+                    android:layout_width="30dp"
+                    android:layout_height="30dp"
+                    android:contentDescription="@null"
+                    android:scaleType="centerCrop"
+                    android:src="@drawable/ic_launcher_foreground" />
+
+                <TextView
+                    android:id="@+id/widget_playlist_label_3"
                     android:layout_width="0dp"
-                    android:layout_height="match_parent"
-                    android:layout_marginEnd="4dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="6dp"
                     android:layout_weight="1"
-                    android:gravity="center"
-                    android:orientation="horizontal">
+                    android:ellipsize="end"
+                    android:fontFamily="@font/zt_nature_bold"
+                    android:maxLines="1"
+                    android:text="@string/widget_mix"
+                    android:textColor="#FF231F1B"
+                    android:textSize="11sp" />
+            </LinearLayout>
 
-                    <ImageView
-                        android:id="@+id/widget_playlist_art_3"
-                        android:layout_width="28dp"
-                        android:layout_height="28dp"
-                        android:background="@drawable/bg_widget_artwork_small"
-                        android:clipToOutline="true"
-                        android:contentDescription="@null"
-                        android:scaleType="centerCrop"
-                        android:src="@drawable/ic_launcher_foreground" />
+            <LinearLayout
+                android:id="@+id/widget_playlist_4"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
 
-                    <TextView
-                        android:id="@+id/widget_playlist_label_3"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="4dp"
-                        android:layout_weight="1"
-                        android:ellipsize="end"
-                        android:fontFamily="@font/gilroy_bold"
-                        android:maxLines="1"
-                        android:text="@string/widget_mix"
-                        android:textColor="#FF181A1D"
-                        android:textSize="8sp" />
-                </LinearLayout>
+                <ImageView
+                    android:id="@+id/widget_playlist_art_4"
+                    android:layout_width="30dp"
+                    android:layout_height="30dp"
+                    android:contentDescription="@null"
+                    android:scaleType="centerCrop"
+                    android:src="@drawable/ic_launcher_foreground" />
 
-                <LinearLayout
-                    android:id="@+id/widget_playlist_4"
+                <TextView
+                    android:id="@+id/widget_playlist_label_4"
                     android:layout_width="0dp"
-                    android:layout_height="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="6dp"
                     android:layout_weight="1"
-                    android:gravity="center"
-                    android:orientation="horizontal">
-
-                    <ImageView
-                        android:id="@+id/widget_playlist_art_4"
-                        android:layout_width="28dp"
-                        android:layout_height="28dp"
-                        android:background="@drawable/bg_widget_artwork_small"
-                        android:clipToOutline="true"
-                        android:contentDescription="@null"
-                        android:scaleType="centerCrop"
-                        android:src="@drawable/ic_launcher_foreground" />
-
-                    <TextView
-                        android:id="@+id/widget_playlist_label_4"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="4dp"
-                        android:layout_weight="1"
-                        android:ellipsize="end"
-                        android:fontFamily="@font/gilroy_bold"
-                        android:maxLines="1"
-                        android:text="@string/widget_mix"
-                        android:textColor="#FF181A1D"
-                        android:textSize="8sp" />
-                </LinearLayout>
+                    android:ellipsize="end"
+                    android:fontFamily="@font/zt_nature_bold"
+                    android:maxLines="1"
+                    android:text="@string/widget_mix"
+                    android:textColor="#FF231F1B"
+                    android:textSize="11sp" />
+            </LinearLayout>
             </LinearLayout>
         </LinearLayout>
     </LinearLayout>
-
-    <ImageView
-        android:id="@+id/widget_artwork"
-        android:layout_width="96dp"
-        android:layout_height="96dp"
-        android:layout_gravity="start|top"
-        android:layout_marginStart="28dp"
-        android:layout_marginTop="16dp"
-        android:background="@drawable/bg_widget_large_art"
-        android:clipToOutline="true"
-        android:contentDescription="@null"
-        android:scaleType="centerCrop"
-        android:src="@drawable/ic_launcher_foreground" />
-
-</FrameLayout>
+</LinearLayout>

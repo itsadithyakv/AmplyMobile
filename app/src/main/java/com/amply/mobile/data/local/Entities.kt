@@ -101,3 +101,29 @@ data class SettingEntity(
     @PrimaryKey val key: String,
     val value: String,
 )
+
+/**
+ * One listen that counted as a play or a skip, with when it happened. The songs table only keeps
+ * lifetime totals; stats ranges and Amply Encore need to know when.
+ */
+@Entity(tableName = "play_events", indices = [Index("atMs"), Index("songId")])
+data class PlayEventEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val songId: Long,
+    val atMs: Long,
+    val listenedMs: Long,
+    val skipped: Boolean,
+)
+
+/** A smart playlist that fills itself from rules (desktop "smart playlists", a Pro feature). */
+@Entity(tableName = "rule_playlists")
+data class RulePlaylistEntity(
+    @PrimaryKey val id: String,
+    val name: String,
+    /** JSON array of rules; see playlist/RulePlaylists.kt. */
+    val rulesJson: String,
+    val matchAll: Boolean,
+    val limit: Int,
+    val sort: String,
+    val updatedAtSec: Long,
+)

@@ -11,6 +11,15 @@
     android:paddingVertical="7dp"
     android:weightSum="2">
 
+    <ImageView
+        android:id="@+id/widget_artwork"
+        android:layout_width="44dp"
+        android:layout_height="44dp"
+        android:layout_marginEnd="10dp"
+        android:contentDescription="@null"
+        android:scaleType="centerCrop"
+        android:src="@drawable/ic_launcher_foreground" />
+
     <LinearLayout
         android:layout_width="0dp"
         android:layout_height="match_parent"
@@ -25,10 +34,10 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:ellipsize="end"
-                android:fontFamily="@font/gilroy_bold"
+                android:fontFamily="@font/zt_nature_bold"
                 android:maxLines="1"
                 android:text="@string/app_name"
-                android:textColor="#FFFFFFFF"
+                android:textColor="#FF231F1B"
                 android:textSize="13sp" />
 
             <TextView
@@ -37,10 +46,10 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
                 android:ellipsize="end"
-                android:fontFamily="@font/gilroy_regular"
+                android:fontFamily="@font/zt_nature_medium"
                 android:maxLines="1"
                 android:text="@string/widget_no_song"
-                android:textColor="#D8FFFFFF"
+                android:textColor="#FF544C43"
                 android:textSize="11sp" />
     </LinearLayout>
 
@@ -61,7 +70,7 @@
             android:padding="8dp"
             android:scaleType="centerInside"
             android:src="@drawable/ic_amply_previous"
-            android:tint="#B8FFFFFF" />
+            android:tint="#FF544C43" />
 
         <ImageButton
             android:id="@+id/widget_play_pause"
@@ -84,6 +93,6 @@
             android:padding="8dp"
             android:scaleType="centerInside"
             android:src="@drawable/ic_amply_next"
-            android:tint="#B8FFFFFF" />
+            android:tint="#FF544C43" />
     </LinearLayout>
 </LinearLayout>

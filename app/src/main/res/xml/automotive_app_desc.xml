@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Declares Amply as a media app to Android Auto; the browse tree comes from AmplyPlaybackService. -->
+<automotiveApp>
+    <uses name="media" />
+</automotiveApp>

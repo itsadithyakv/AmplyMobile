@@ -29,8 +29,36 @@ interface SongDao {
     )
     suspend fun recentSongsForWidget(excludeSongId: Long, limit: Int): List<SongEntity>
 
+    /** Prefer [songsByIdsChunked]: SQLite before 3.32 (Android 11 and older) caps bound arguments at 999. */
     @Query("SELECT * FROM songs WHERE id IN (:songIds)")
     suspend fun songsByIds(songIds: List<Long>): List<SongEntity>
+
+    @Query("SELECT * FROM songs WHERE id = :songId")
+    fun observeSong(songId: Long): Flow<SongEntity?>
+
+    @Query("SELECT * FROM songs WHERE contentUri = :contentUri LIMIT 1")
+    suspend fun songByContentUri(contentUri: String): SongEntity?
+
+    @Query("SELECT id FROM songs")
+    suspend fun allSongIds(): List<Long>
+
+    @Query(
+        """
+        SELECT * FROM songs
+        WHERE title LIKE '%' || :query || '%'
+            OR artist LIKE '%' || :query || '%'
+            OR album LIKE '%' || :query || '%'
+        ORDER BY playCount DESC, title COLLATE NOCASE
+        LIMIT :limit
+        """,
+    )
+    suspend fun searchSongsOnce(query: String, limit: Int): List<SongEntity>
+
+    @Query("SELECT * FROM songs WHERE favorite = 1 ORDER BY title COLLATE NOCASE")
+    suspend fun favoriteSongs(): List<SongEntity>
+
+    @Query("SELECT * FROM songs WHERE lastPlayedAtSec IS NOT NULL ORDER BY lastPlayedAtSec DESC LIMIT :limit")
+    suspend fun recentlyPlayed(limit: Int): List<SongEntity>
 
     @Query(
         """
@@ -48,11 +76,8 @@ interface SongDao {
     @Upsert
     suspend fun upsertSongs(songs: List<SongEntity>)
 
-    @Query("DELETE FROM songs WHERE id NOT IN (:keepIds)")
-    suspend fun deleteSongsNotIn(keepIds: List<Long>)
-
-    @Query("DELETE FROM songs")
-    suspend fun deleteAllSongs()
+    @Query("DELETE FROM songs WHERE id IN (:songIds)")
+    suspend fun deleteSongsByIds(songIds: List<Long>)
 
     @Query("UPDATE songs SET favorite = :favorite WHERE id = :songId")
     suspend fun setFavorite(songId: Long, favorite: Boolean)

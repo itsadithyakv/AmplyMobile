@@ -5,6 +5,7 @@
     android:minWidth="300dp"
     android:minHeight="150dp"
     android:previewImage="@drawable/ic_launcher_foreground"
+    android:previewLayout="@layout/widget_amply_player"
     android:resizeMode="horizontal|vertical"
     android:targetCellWidth="4"
     android:targetCellHeight="2"

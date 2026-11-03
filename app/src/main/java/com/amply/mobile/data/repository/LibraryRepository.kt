@@ -2,6 +2,7 @@ package com.amply.mobile.data.repository
 
 import android.net.Uri
 import com.amply.mobile.data.local.SongDao
+import com.amply.mobile.data.local.songsByIdsChunked
 import com.amply.mobile.data.local.toDomain
 import com.amply.mobile.domain.Song
 import com.amply.mobile.scan.MusicScanner
@@ -23,9 +24,7 @@ class LibraryRepository(
     suspend fun allSongs(): List<Song> = songDao.allSongs().map { it.toDomain() }
 
     suspend fun songsByIds(songIds: List<Long>): List<Song> {
-        if (songIds.isEmpty()) return emptyList()
-        val byId = songDao.songsByIds(songIds).associateBy { it.id }
-        return songIds.mapNotNull { byId[it]?.toDomain() }
+        return songDao.songsByIdsChunked(songIds).map { it.toDomain() }
     }
 
     suspend fun scanLibrary(): Int = scanner.scan()

@@ -1,182 +1,88 @@
 package com.amply.mobile
 
-import android.Manifest
-import android.content.Context
-import android.content.Intent
-import android.content.pm.PackageManager
-import android.graphics.BitmapFactory
-import android.net.Uri
-import android.os.Build
-import android.os.Bundle
-import androidx.activity.ComponentActivity
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.compose.setContent
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.Crossfade
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.rounded.Favorite
-import androidx.compose.material.icons.rounded.FavoriteBorder
-import androidx.compose.material.icons.rounded.FolderOpen
-import androidx.compose.material.icons.rounded.GraphicEq
-import androidx.compose.material.icons.rounded.Home
-import androidx.compose.material.icons.rounded.LibraryMusic
-import androidx.compose.material.icons.rounded.MoreHoriz
-import androidx.compose.material.icons.rounded.MusicNote
-import androidx.compose.material.icons.rounded.Pause
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.PlayArrow
-import androidx.compose.material.icons.rounded.Refresh
-import androidx.compose.material.icons.rounded.Repeat
 import androidx.compose.material.icons.rounded.Search
-import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Shuffle
-import androidx.compose.material.icons.rounded.SkipNext
-import androidx.compose.material.icons.rounded.SkipPrevious
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.Outline
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Density
-import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import androidx.lifecycle.viewmodel.compose.viewModel
-import com.amply.mobile.domain.CachedLyrics
 import com.amply.mobile.domain.Playlist
 import com.amply.mobile.domain.PlaylistType
-import com.amply.mobile.domain.RepeatMode
 import com.amply.mobile.domain.Song
-import com.amply.mobile.lyrics.parseLrc
-import com.amply.mobile.ui.theme.AmplyBg
-import com.amply.mobile.ui.theme.AmplyBgPurple
-import com.amply.mobile.ui.theme.AmplyBrand
-import com.amply.mobile.ui.theme.AmplyCard
-import com.amply.mobile.ui.theme.AmplyGlass
-import com.amply.mobile.ui.theme.AmplyLime
-import com.amply.mobile.ui.theme.AmplyMuted
-import com.amply.mobile.ui.theme.AmplyOrange
-import com.amply.mobile.ui.theme.AmplyPanel
-import com.amply.mobile.ui.theme.AmplyTheme
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import kotlin.math.PI
-import kotlin.math.abs
-import kotlin.math.atan2
-import kotlin.math.min
-import kotlin.math.roundToInt
-
+import com.amply.mobile.ui.theme.Palette
+import com.amply.mobile.ui.theme.neuPressed
+import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Edit
+import com.amply.mobile.playlist.RulePlaylist
+import com.amply.mobile.playlist.describe
+import com.amply.mobile.ui.theme.neuRaised
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.ui.graphics.SolidColor
 
 @Composable
-fun SearchScreen(query: String, results: List<Song>, onQuery: (String) -> Unit, onSong: (Song) -> Unit) {
+fun SearchScreen(
+    query: String,
+    results: List<Song>,
+    currentSongId: Long?,
+    onQuery: (String) -> Unit,
+    onSong: (Song) -> Unit,
+    onMore: (Song) -> Unit,
+) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = 22.dp, end = 22.dp, top = 28.dp, bottom = 118.dp),
+        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
-            Text("Search", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Black)
-            Spacer(Modifier.height(14.dp))
-            OutlinedTextField(
-                value = query,
-                onValueChange = onQuery,
-                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)),
-                singleLine = true,
-                leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null) },
-                label = { Text("Songs, artists, albums") },
-            )
+            Text("Search", style = MaterialTheme.typography.headlineLarge)
+            Spacer(Modifier.height(16.dp))
+            NeuSearchField(query = query, onQuery = onQuery, placeholder = "Songs, artists, albums, genres")
+        }
+        if (query.isNotBlank() && results.isEmpty()) {
+            item {
+                Text("No songs match \"$query\"", color = Palette.textSecondary, modifier = Modifier.padding(top = 24.dp))
+            }
         }
         items(results, key = { it.id }) { song ->
-            SongListRow(song = song, onClick = { onSong(song) }, onPlay = { onSong(song) })
+            SongListRow(song = song, onClick = { onSong(song) }, onPlay = { onSong(song) }, onMore = { onMore(song) }, isCurrent = song.id == currentSongId)
         }
     }
 }
@@ -187,29 +93,44 @@ enum class LibraryFilter { All, Playlists, Liked, Genres }
 fun LibraryScreen(
     songs: List<Song>,
     playlists: List<Playlist>,
-    onSong: (Song) -> Unit,
+    currentSongId: Long?,
+    onSong: (Song, List<Song>) -> Unit,
     onFavorite: (Song) -> Unit,
+    onMore: (Song) -> Unit,
     onOpenPlaylist: (String) -> Unit,
     onPlayPlaylist: (Playlist) -> Unit,
     onAddFolder: () -> Unit,
     onScan: () -> Unit,
+    onShuffleAll: () -> Unit,
+    ruleResults: List<Pair<RulePlaylist, List<Song>>> = emptyList(),
+    isPro: Boolean = false,
+    onNewRulePlaylist: () -> Unit = {},
+    onEditRulePlaylist: (RulePlaylist) -> Unit = {},
+    onPlayRuleSongs: (List<Song>, Boolean) -> Unit = { _, _ -> },
 ) {
-    var filter by remember { mutableStateOf(LibraryFilter.All) }
+    var filter by rememberSaveable { mutableStateOf(LibraryFilter.All) }
+    val liked = remember(songs) { songs.filter { it.favorite } }
+    val genres = remember(songs) { songs.groupBy { it.effectiveGenre }.toList().sortedByDescending { it.second.size } }
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = 22.dp, end = 22.dp, top = 24.dp, bottom = 118.dp),
+        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Spacer(Modifier.weight(1f))
-                Text("My Music", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black)
-                Spacer(Modifier.weight(1f))
+                Column(Modifier.weight(1f)) {
+                    Text("Library", style = MaterialTheme.typography.headlineLarge)
+                    Text("${songs.size} songs indexed", color = Palette.textSecondary, style = MaterialTheme.typography.bodySmall)
+                }
+                if (songs.isNotEmpty()) {
+                    AmplyIconButton(Icons.Rounded.Shuffle, "Shuffle all songs", onShuffleAll, highlight = true)
+                    Spacer(Modifier.width(10.dp))
+                }
                 LibraryActions(onAddFolder = onAddFolder, onScan = onScan)
             }
         }
         item {
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp), contentPadding = PaddingValues(vertical = 6.dp, horizontal = 4.dp)) {
                 items(LibraryFilter.entries) { item ->
                     AmplyChip(
                         label = when (item) {
@@ -229,20 +150,57 @@ fun LibraryScreen(
         }
         when (filter) {
             LibraryFilter.All -> items(songs, key = { it.id }) { song ->
-                SongListRow(song = song, onClick = { onSong(song) }, onPlay = { onSong(song) }, onFavorite = { onFavorite(song) })
+                SongListRow(
+                    song = song,
+                    onClick = { onSong(song, songs) },
+                    onPlay = { onSong(song, songs) },
+                    onFavorite = { onFavorite(song) },
+                    onMore = { onMore(song) },
+                    isCurrent = song.id == currentSongId,
+                )
             }
-            LibraryFilter.Liked -> items(songs.filter { it.favorite }, key = { it.id }) { song ->
-                SongListRow(song = song, onClick = { onSong(song) }, onPlay = { onSong(song) }, onFavorite = { onFavorite(song) })
+            LibraryFilter.Liked -> {
+                if (liked.isEmpty() && songs.isNotEmpty()) {
+                    item { Text("Tap the heart on a song to keep it here.", color = Palette.textSecondary) }
+                }
+                items(liked, key = { it.id }) { song ->
+                    SongListRow(
+                        song = song,
+                        onClick = { onSong(song, liked) },
+                        onPlay = { onSong(song, liked) },
+                        onFavorite = { onFavorite(song) },
+                        onMore = { onMore(song) },
+                        isCurrent = song.id == currentSongId,
+                    )
+                }
             }
-            LibraryFilter.Playlists -> items(playlists, key = { it.id }) { playlist ->
+            LibraryFilter.Playlists -> {
+                item {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp)) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Smart playlists", style = MaterialTheme.typography.titleLarge)
+                            Text("Fill themselves from rules and stay up to date.", color = Palette.textSecondary, style = MaterialTheme.typography.bodySmall)
+                        }
+                        if (!isPro) ProLock(Modifier.padding(end = 8.dp))
+                        NeuButton("New", Icons.Rounded.Add, onNewRulePlaylist)
+                    }
+                }
+                items(ruleResults, key = { it.first.id }) { (rule, ruleSongs) ->
+                    RulePlaylistRow(rule, ruleSongs, onPlay = { onPlayRuleSongs(ruleSongs, false) }, onEdit = { onEditRulePlaylist(rule) })
+                }
+                item { Text("Playlists", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(top = 8.dp)) }
+                items(playlists, key = { it.id }) { playlist ->
                 PlaylistListRow(
                     playlist = playlist,
                     onClick = { onOpenPlaylist(playlist.id) },
                     onPlay = { onPlayPlaylist(playlist) },
+                    artworkUri = playlist.songIds.firstNotNullOfOrNull { id -> songs.firstOrNull { it.id == id }?.artworkUri } ?: playlist.artworkUri,
                 )
             }
-            LibraryFilter.Genres -> items(songs.groupBy { it.effectiveGenre }.toList(), key = { it.first }) { (genre, genreSongs) ->
-                GenreRow(genre = genre, count = genreSongs.size, onClick = { genreSongs.firstOrNull()?.let(onSong) })
+            }
+            // A genre row plays that genre; it used to start only its first song.
+            LibraryFilter.Genres -> items(genres, key = { it.first }) { (genre, genreSongs) ->
+                GenreRow(genre = genre, count = genreSongs.size, onClick = { genreSongs.firstOrNull()?.let { onSong(it, genreSongs) } })
             }
         }
     }
@@ -252,13 +210,18 @@ fun LibraryScreen(
 fun PlaylistDetailScreen(
     playlist: Playlist?,
     songs: List<Song>,
+    currentSongId: Long?,
     onBack: () -> Unit,
     onPlay: () -> Unit,
+    onShuffle: () -> Unit,
     onSong: (Song) -> Unit,
+    onMore: (Song) -> Unit,
+    onDelete: () -> Unit,
 ) {
+    var confirmDelete by remember { mutableStateOf(false) }
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = 22.dp, end = 22.dp, top = 24.dp, bottom = 118.dp),
+        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
@@ -266,15 +229,96 @@ fun PlaylistDetailScreen(
                 AmplyIconButton(Icons.AutoMirrored.Rounded.ArrowBack, "Back", onBack)
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
-                    Text(playlist?.name ?: "Playlist", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Black)
-                    Text("${songs.size} songs", color = AmplyMuted)
+                    Text(
+                        playlist?.name ?: "Playlist",
+                        style = MaterialTheme.typography.headlineMedium,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text("${songs.size} songs", color = Palette.textSecondary)
                 }
-                AmplyIconButton(Icons.Rounded.PlayArrow, "Play", onPlay, highlight = true)
+                if (playlist?.type == PlaylistType.Custom) {
+                    IconButton(onClick = { confirmDelete = true }) { Icon(Icons.Rounded.Delete, contentDescription = "Delete playlist") }
+                }
+            }
+        }
+        if (songs.isNotEmpty()) {
+            item {
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    AmplyIconButton(Icons.Rounded.PlayArrow, "Play playlist", onPlay, highlight = true)
+                    AmplyIconButton(Icons.Rounded.Shuffle, "Shuffle playlist", onShuffle)
+                    playlist?.description?.takeIf { it.isNotBlank() }?.let {
+                        Text(it, color = Palette.textSecondary, style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    }
+                }
+            }
+        } else {
+            item {
+                Box(Modifier.fillMaxWidth().padding(top = 32.dp), contentAlignment = Alignment.Center) {
+                    Text("No songs yet. Long-press any song and choose \"Add to playlist\".", color = Palette.textSecondary)
+                }
             }
         }
         items(songs, key = { it.id }) { song ->
-            SongListRow(song = song, onClick = { onSong(song) }, onPlay = { onSong(song) })
+            SongListRow(song = song, onClick = { onSong(song) }, onPlay = { onSong(song) }, onMore = { onMore(song) }, isCurrent = song.id == currentSongId)
+        }
+    }
+    if (confirmDelete && playlist != null) {
+        AlertDialog(
+            onDismissRequest = { confirmDelete = false },
+            title = { Text("Delete \"${playlist.name}\"?") },
+            text = { Text("The songs stay in your library.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmDelete = false
+                    onDelete()
+                }) { Text("Delete") }
+            },
+            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Cancel") } },
+        )
+    }
+}
+
+/** The desktop's pressed-in search field. */
+@Composable
+fun NeuSearchField(query: String, onQuery: (String) -> Unit, placeholder: String) {
+    val p = Palette
+    Row(
+        Modifier.fillMaxWidth().neuPressed(CircleShape, small = false).padding(horizontal = 16.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(Icons.Rounded.Search, contentDescription = null, tint = p.textMuted, modifier = Modifier.size(20.dp))
+        Spacer(Modifier.width(10.dp))
+        Box(Modifier.weight(1f).padding(vertical = 12.dp)) {
+            if (query.isEmpty()) Text(placeholder, color = p.textMuted, style = MaterialTheme.typography.bodyLarge, maxLines = 1)
+            BasicTextField(
+                value = query,
+                onValueChange = onQuery,
+                singleLine = true,
+                textStyle = MaterialTheme.typography.bodyLarge.copy(color = p.textPrimary),
+                cursorBrush = SolidColor(p.accent),
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+        if (query.isNotEmpty()) {
+            NeuIconButton(Icons.Rounded.Close, "Clear search", { onQuery("") }, size = 34.dp, flat = true, tint = p.textMuted)
         }
     }
 }
 
+@Composable
+private fun RulePlaylistRow(playlist: RulePlaylist, songs: List<Song>, onPlay: () -> Unit, onEdit: () -> Unit) {
+    val p = Palette
+    Row(
+        Modifier.fillMaxWidth().neuRaised(RadiusMd).clip(RadiusMd).clickable(onClickLabel = "Play ${playlist.name}", onClick = onPlay).padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        ArtworkBox(songs.firstOrNull()?.artworkUri, 46.dp, shape = RadiusSm, audioUri = songs.firstOrNull()?.contentUri)
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(playlist.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text("${songs.size} songs  ·  ${playlist.describe()}", color = p.textSecondary, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        NeuIconButton(Icons.Rounded.Edit, "Edit ${playlist.name}", onEdit, size = 36.dp, flat = true, tint = p.textMuted)
+    }
+}

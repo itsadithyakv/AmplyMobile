@@ -13,8 +13,10 @@ import androidx.room.RoomDatabase
         ArtistInfoEntity::class,
         QueueStateEntity::class,
         SettingEntity::class,
+        PlayEventEntity::class,
+        RulePlaylistEntity::class,
     ],
-    version = 3,
+    version = 4,
     exportSchema = true,
 )
 abstract class AmplyDatabase : RoomDatabase() {
@@ -25,4 +27,6 @@ abstract class AmplyDatabase : RoomDatabase() {
     abstract fun artistInfoDao(): ArtistInfoDao
     abstract fun settingsDao(): SettingsDao
     abstract fun queueDao(): QueueDao
+    abstract fun playEventDao(): PlayEventDao
+    abstract fun rulePlaylistDao(): RulePlaylistDao
 }
