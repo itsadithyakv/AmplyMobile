@@ -136,16 +136,34 @@ class MusicScanner(
         songs.size
     }
 
+    /**
+     * Asks MediaScanner to index audio files in Music/ that MediaStore doesn't know yet (copied
+     * over USB or adb, say). It used to rescan every file on every scan, which made a 300-song
+     * scan take over a minute; files already indexed are now skipped.
+     */
     private suspend fun rescanPublicMusicDirectory() {
         val musicDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC)
-        val paths = musicDir
+        val onDisk = musicDir
             ?.takeIf { it.exists() }
             ?.walkTopDown()
             ?.filter { it.isFile && it.extension.lowercase() in audioExtensions }
             ?.map(File::getAbsolutePath)
-            ?.take(3_000)
+            ?.take(10_000)
             ?.toList()
             .orEmpty()
+        if (onDisk.isEmpty()) return
+        val indexed = HashSet<String>()
+        runCatching {
+            @Suppress("DEPRECATION")
+            context.contentResolver.query(
+                MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
+                arrayOf(MediaStore.Audio.Media.DATA),
+                null,
+                null,
+                null,
+            )?.use { cursor -> while (cursor.moveToNext()) cursor.getString(0)?.let(indexed::add) }
+        }
+        val paths = onDisk.filterNot { it in indexed }
         if (paths.isEmpty()) return
         suspendCancellableCoroutine<Unit> { continuation ->
             val remaining = AtomicInteger(paths.size)

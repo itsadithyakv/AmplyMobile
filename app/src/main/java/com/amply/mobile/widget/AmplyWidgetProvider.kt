@@ -12,7 +12,9 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.Shader
+import android.os.Build
 import android.os.Bundle
+import android.util.SizeF
 import android.view.View
 import android.widget.RemoteViews
 import androidx.media3.common.util.UnstableApi
@@ -96,9 +98,11 @@ open class AmplyWidgetProvider : AppWidgetProvider() {
         private const val EXTRA_PLAYLIST_ID = "playlist_id"
         private val controlActions = setOf(ACTION_PLAY_PAUSE, ACTION_PREVIOUS, ACTION_NEXT, ACTION_PLAY_PLAYLIST)
 
-        private const val ART_PX = 256
+        private const val ART_PX = 384
+        private const val SMALL_ART_PX = 192
         private const val SHORTCUT_ART_PX = 96
         private const val PROGRESS_MAX = 1000
+        private const val SHORTCUTS_TTL_MS = 5 * 60_000L
 
         private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
         private val providers = listOf(AmplyWidgetProvider::class.java, AmplyLargeWidgetProvider::class.java)
@@ -108,10 +112,35 @@ open class AmplyWidgetProvider : AppWidgetProvider() {
         private var hasServiceState = false
         private var renderJob: Job? = null
 
+        /**
+         * Shortcuts change only when mixes are regenerated, but the widget redraws every few
+         * seconds while playing; rebuilding them each time cost four queries and four decodes.
+         */
+        private var shortcutCache: Triple<Long, Boolean, List<PlaylistShortcut>>? = null
+
+        private var smallArtSource: Bitmap? = null
+        private var smallArtCopy: Bitmap? = null
+
+        /** Scaled, rounded copy for the strip and medium layouts, made once per cover. */
+        private fun smallArtFor(context: Context, art: Bitmap): Bitmap {
+            smallArtCopy?.takeIf { smallArtSource === art }?.let { return it }
+            val copy = Bitmap.createScaledBitmap(art, SMALL_ART_PX, SMALL_ART_PX * art.height / art.width.coerceAtLeast(1), true)
+                .rounded(context.dp(10).toFloat())
+            smallArtSource = art
+            smallArtCopy = copy
+            return copy
+        }
+
         /** Called by the playback service whenever something the widget shows has changed. */
         fun publish(context: Context, snapshot: NowPlayingSnapshot?) {
             latest = snapshot
             hasServiceState = true
+            refresh(context)
+        }
+
+        /** Mixes were regenerated: shortcuts must be rebuilt on the next draw. */
+        fun invalidateShortcuts(context: Context) {
+            shortcutCache = null
             refresh(context)
         }
 
@@ -126,10 +155,7 @@ open class AmplyWidgetProvider : AppWidgetProvider() {
             val ids = providers.flatMap { manager.getAppWidgetIds(ComponentName(context, it)).toList() }
             if (ids.isEmpty()) return
             val state = loadState(context)
-            ids.forEach { id ->
-                val large = manager.getAppWidgetInfo(id)?.provider?.className == AmplyLargeWidgetProvider::class.java.name
-                manager.updateAppWidget(id, buildViews(context, state, manager.getAppWidgetOptions(id), large))
-            }
+            ids.forEach { id -> manager.updateAppWidget(id, responsiveViews(context, state, manager.getAppWidgetOptions(id))) }
         }
 
         private suspend fun loadState(context: Context): WidgetState = withContext(Dispatchers.IO) {
@@ -155,6 +181,7 @@ open class AmplyWidgetProvider : AppWidgetProvider() {
                 title = title ?: context.getString(R.string.widget_idle_title),
                 artist = artist ?: context.getString(R.string.widget_idle_subtitle),
                 art = art,
+                smallArt = art?.let { smallArtFor(context, it) },
                 hasSong = title != null,
                 isPlaying = live?.isPlaying == true,
                 progress = live?.takeIf { it.durationMs > 0L }
@@ -173,23 +200,38 @@ open class AmplyWidgetProvider : AppWidgetProvider() {
             val database = container.database
             val debugPro = database.settingsDao().valueFor("debugPro")?.toBooleanStrictOrNull() ?: false
             val isPro = AmplyApplication.isPro(container.proStore.state.value.owned, debugPro)
+            val now = System.currentTimeMillis()
+            shortcutCache?.let { (at, pro, cached) -> if (pro == isPro && now - at < SHORTCUTS_TTL_MS) return cached }
             // Genre and mood mixes are Pro; the free widget only offers the core mixes.
-            return database.playlistDao().playablePlaylists(16).filter { isPro || !isProMix(it.id) }.take(4).map { playlist ->
+            val shortcuts = database.playlistDao().playablePlaylists(16).filter { isPro || !isProMix(it.id) }.take(4).map { playlist ->
                 val firstId = database.playlistDao().songIdsForPlaylist(playlist.id).firstOrNull()
                 val first = firstId?.let { database.songDao().songById(it) }
                 PlaylistShortcut(
                     id = playlist.id,
                     name = playlist.name.widgetPlaylistLabel(),
-                    art = first?.let { ArtworkLoader.load(context, it.artworkUri, SHORTCUT_ART_PX, it.contentUri) },
+                    art = first?.let { ArtworkLoader.load(context, it.artworkUri, SHORTCUT_ART_PX, it.contentUri) }
+                        ?.rounded(context.dp(7).toFloat()),
                 )
             }
+            shortcutCache = Triple(now, isPro, shortcuts)
+            return shortcuts
         }
 
-        private fun buildViews(context: Context, state: WidgetState, options: Bundle, largeProvider: Boolean): RemoteViews {
-            val minHeight = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 0)
-            val large = largeProvider || minHeight >= 140
-            val layout = if (large) R.layout.widget_amply_player else R.layout.widget_amply_player_compact
-            return RemoteViews(context.packageName, layout).apply {
+        /**
+         * Android 12+: hand the launcher one layout per size and let it pick as the widget is
+         * resized. Older versions: pick ourselves from the size the launcher reports.
+         */
+        private fun responsiveViews(context: Context, state: WidgetState, options: Bundle): RemoteViews {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                return RemoteViews(WIDGET_BREAKPOINTS.associate { (size, variant) -> SizeF(size.first, size.second) to buildViews(context, state, variant) })
+            }
+            val width = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 0).toFloat()
+            val height = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 0).toFloat()
+            return buildViews(context, state, chooseWidgetVariant(width, height))
+        }
+
+        private fun buildViews(context: Context, state: WidgetState, variant: WidgetVariant): RemoteViews =
+            RemoteViews(context.packageName, variant.layout).apply {
                 setTextViewText(R.id.widget_title, state.title)
                 setTextViewText(R.id.widget_artist, state.artist)
                 setImageViewResource(R.id.widget_play_pause, if (state.isPlaying) R.drawable.ic_amply_pause else R.drawable.ic_amply_play)
@@ -202,20 +244,23 @@ open class AmplyWidgetProvider : AppWidgetProvider() {
                 setOnClickPendingIntent(R.id.widget_play_pause, controlIntent(context, ACTION_PLAY_PAUSE))
                 setOnClickPendingIntent(R.id.widget_next, controlIntent(context, ACTION_NEXT))
 
-                val art = state.art
+                // The cover layout clips the full-bleed image to the widget's corners itself.
+                val art = if (variant.coverBacked) state.art else state.smallArt
                 if (art != null) {
-                    setImageViewBitmap(R.id.widget_artwork, art.rounded(context.dp(if (large) 16 else 12).toFloat()))
+                    setImageViewBitmap(R.id.widget_artwork, art)
                 } else {
-                    setImageViewResource(R.id.widget_artwork, R.drawable.ic_launcher_foreground)
+                    setImageViewResource(R.id.widget_artwork, R.drawable.widget_art_placeholder)
                 }
-
-                if (large) {
+                if (variant != WidgetVariant.Small) {
                     setViewVisibility(R.id.widget_progress, if (state.hasSong) View.VISIBLE else View.GONE)
                     setProgressBar(R.id.widget_progress, PROGRESS_MAX, state.progress, false)
-                    bindPlaylists(context, state.playlists)
+                }
+                if (variant.coverBacked) {
+                    val showMixes = variant.mixes && state.playlists.isNotEmpty()
+                    setViewVisibility(R.id.widget_playlist_row, if (showMixes) View.VISIBLE else View.GONE)
+                    if (showMixes) bindPlaylists(context, state.playlists)
                 }
             }
-        }
 
         private fun RemoteViews.bindPlaylists(context: Context, playlists: List<PlaylistShortcut>) {
             val rows = listOf(R.id.widget_playlist_1, R.id.widget_playlist_2, R.id.widget_playlist_3, R.id.widget_playlist_4)
@@ -231,11 +276,7 @@ open class AmplyWidgetProvider : AppWidgetProvider() {
                 setTextViewText(labels[index], playlist.name)
                 setContentDescription(row, context.getString(R.string.widget_play_playlist, playlist.name))
                 val art = playlist.art
-                if (art != null) {
-                    setImageViewBitmap(arts[index], art.rounded(context.dp(8).toFloat()))
-                } else {
-                    setImageViewResource(arts[index], R.drawable.ic_launcher_foreground)
-                }
+                if (art != null) setImageViewBitmap(arts[index], art) else setImageViewResource(arts[index], R.drawable.widget_art_placeholder)
                 setOnClickPendingIntent(row, playlistIntent(context, playlist.id))
             }
         }
@@ -310,7 +351,10 @@ class AmplyLargeWidgetProvider : AmplyWidgetProvider()
 private data class WidgetState(
     val title: String,
     val artist: String,
+    /** Full-bleed cover for the cover layout. */
     val art: Bitmap?,
+    /** Smaller rounded copy for the strip and medium layouts. */
+    val smallArt: Bitmap?,
     val hasSong: Boolean,
     val isPlaying: Boolean,
     val progress: Int,
@@ -321,6 +365,7 @@ private data class PlaylistShortcut(val id: String, val name: String, val art: B
 
 private fun String.widgetPlaylistLabel(): String =
     replace("Daily ", "")
+        .replace(" Radio", "")
         .replace(" Mix", "")
         .ifBlank { "Mix" }
 

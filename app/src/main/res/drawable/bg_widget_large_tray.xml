@@ -1,6 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!-- Pressed-in well, like the desktop's .neu-pressed surfaces. -->
-<shape xmlns:android="http://schemas.android.com/apk/res/android">
-    <solid android:color="#FFE5E0D8" />
-    <corners android:radius="20dp" />
-</shape>

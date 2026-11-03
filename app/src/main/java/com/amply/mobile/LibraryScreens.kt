@@ -1,5 +1,6 @@
 package com.amply.mobile
 
+import com.amply.mobile.util.plural
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,7 +15,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Close
@@ -26,7 +26,6 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -38,7 +37,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.amply.mobile.domain.Playlist
@@ -49,6 +47,7 @@ import com.amply.mobile.ui.theme.neuPressed
 import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.ExpandMore
 import com.amply.mobile.playlist.RulePlaylist
 import com.amply.mobile.playlist.describe
 import com.amply.mobile.ui.theme.neuRaised
@@ -87,7 +86,18 @@ fun SearchScreen(
     }
 }
 
-enum class LibraryFilter { All, Playlists, Liked, Genres }
+enum class LibraryFilter(val label: String) { All("Songs"), Artists("Artists"), Albums("Albums"), Playlists("Playlists"), Liked("Liked"), Genres("Genres") }
+
+enum class SongSort(val label: String) { Title("Title"), Artist("Artist"), RecentlyAdded("Recently added"), MostPlayed("Most played") }
+
+fun List<Song>.sortedBy(sort: SongSort): List<Song> = when (sort) {
+    SongSort.Title -> sortedBy { it.title.lowercase() }
+    SongSort.Artist -> sortedWith(compareBy<Song> { it.artist.lowercase() }.thenBy { it.album.lowercase() }.thenBy { it.track })
+    SongSort.RecentlyAdded -> sortedByDescending { it.addedAtSec }
+    SongSort.MostPlayed -> sortedWith(compareByDescending<Song> { it.playCount }.thenByDescending { it.lastPlayedAtSec ?: 0L })
+}
+
+data class SongGroup(val key: String, val title: String, val subtitle: String, val songs: List<Song>)
 
 @Composable
 fun LibraryScreen(
@@ -109,7 +119,26 @@ fun LibraryScreen(
     onPlayRuleSongs: (List<Song>, Boolean) -> Unit = { _, _ -> },
 ) {
     var filter by rememberSaveable { mutableStateOf(LibraryFilter.All) }
-    val liked = remember(songs) { songs.filter { it.favorite } }
+    var sort by rememberSaveable { mutableStateOf(SongSort.Title) }
+    val sorted = remember(songs, sort) { songs.sortedBy(sort) }
+    val liked = remember(sorted) { sorted.filter { it.favorite } }
+    val songsById = remember(songs) { songs.associateBy { it.id } }
+    val artists = remember(songs) {
+        songs.groupBy { com.amply.mobile.stats.primaryArtist(it.artist) }
+            .map { (artist, list) ->
+                val ordered = list.sortedWith(compareBy<Song> { it.album.lowercase() }.thenBy { it.track })
+                SongGroup(artist, artist, "${plural(list.size, "song")}  ·  ${plural(list.map { it.album }.distinct().size, "album")}", ordered)
+            }
+            .sortedBy { it.title.lowercase() }
+    }
+    val albums = remember(songs) {
+        songs.groupBy { it.album.lowercase() to (it.albumId ?: 0L) }
+            .map { (_, list) ->
+                val first = list.first()
+                SongGroup("${first.album}|${first.albumId}", first.album, "${first.artist}  ·  ${plural(list.size, "song")}", list.sortedBy { it.track })
+            }
+            .sortedBy { it.title.lowercase() }
+    }
     val genres = remember(songs) { songs.groupBy { it.effectiveGenre }.toList().sortedByDescending { it.second.size } }
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -120,7 +149,7 @@ fun LibraryScreen(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text("Library", style = MaterialTheme.typography.headlineLarge)
-                    Text("${songs.size} songs indexed", color = Palette.textSecondary, style = MaterialTheme.typography.bodySmall)
+                    Text("${plural(songs.size, "song")} indexed", color = Palette.textSecondary, style = MaterialTheme.typography.bodySmall)
                 }
                 if (songs.isNotEmpty()) {
                     AmplyIconButton(Icons.Rounded.Shuffle, "Shuffle all songs", onShuffleAll, highlight = true)
@@ -129,16 +158,14 @@ fun LibraryScreen(
                 LibraryActions(onAddFolder = onAddFolder, onScan = onScan)
             }
         }
+        if (filter == LibraryFilter.All || filter == LibraryFilter.Liked) {
+            item { SortMenu(sort) { sort = it } }
+        }
         item {
             LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp), contentPadding = PaddingValues(vertical = 6.dp, horizontal = 4.dp)) {
                 items(LibraryFilter.entries) { item ->
                     AmplyChip(
-                        label = when (item) {
-                            LibraryFilter.All -> "All"
-                            LibraryFilter.Playlists -> "Playlists"
-                            LibraryFilter.Liked -> "Liked Songs"
-                            LibraryFilter.Genres -> "Genres"
-                        },
+                        label = item.label,
                         selected = filter == item,
                         onClick = { filter = item },
                     )
@@ -149,11 +176,11 @@ fun LibraryScreen(
             item { EmptyLibraryActions(onAddFolder = onAddFolder, onScan = onScan) }
         }
         when (filter) {
-            LibraryFilter.All -> items(songs, key = { it.id }) { song ->
+            LibraryFilter.All -> items(sorted, key = { it.id }) { song ->
                 SongListRow(
                     song = song,
-                    onClick = { onSong(song, songs) },
-                    onPlay = { onSong(song, songs) },
+                    onClick = { onSong(song, sorted) },
+                    onPlay = { onSong(song, sorted) },
                     onFavorite = { onFavorite(song) },
                     onMore = { onMore(song) },
                     isCurrent = song.id == currentSongId,
@@ -194,9 +221,15 @@ fun LibraryScreen(
                     playlist = playlist,
                     onClick = { onOpenPlaylist(playlist.id) },
                     onPlay = { onPlayPlaylist(playlist) },
-                    artworkUri = playlist.songIds.firstNotNullOfOrNull { id -> songs.firstOrNull { it.id == id }?.artworkUri } ?: playlist.artworkUri,
+                    artworkUri = playlist.songIds.firstNotNullOfOrNull { id -> songsById[id]?.artworkUri } ?: playlist.artworkUri,
                 )
             }
+            }
+            LibraryFilter.Artists -> items(artists, key = { it.key }) { group ->
+                GroupRow(group, round = true) { group.songs.firstOrNull()?.let { onSong(it, group.songs) } }
+            }
+            LibraryFilter.Albums -> items(albums, key = { it.key }) { group ->
+                GroupRow(group, round = false) { group.songs.firstOrNull()?.let { onSong(it, group.songs) } }
             }
             // A genre row plays that genre; it used to start only its first song.
             LibraryFilter.Genres -> items(genres, key = { it.first }) { (genre, genreSongs) ->
@@ -235,7 +268,7 @@ fun PlaylistDetailScreen(
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                     )
-                    Text("${songs.size} songs", color = Palette.textSecondary)
+                    Text(plural(songs.size, "song"), color = Palette.textSecondary)
                 }
                 if (playlist?.type == PlaylistType.Custom) {
                     IconButton(onClick = { confirmDelete = true }) { Icon(Icons.Rounded.Delete, contentDescription = "Delete playlist") }
@@ -317,8 +350,54 @@ private fun RulePlaylistRow(playlist: RulePlaylist, songs: List<Song>, onPlay: (
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Text(playlist.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text("${songs.size} songs  ·  ${playlist.describe()}", color = p.textSecondary, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text("${plural(songs.size, "song")}  ·  ${playlist.describe()}", color = p.textSecondary, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         NeuIconButton(Icons.Rounded.Edit, "Edit ${playlist.name}", onEdit, size = 36.dp, flat = true, tint = p.textMuted)
+    }
+}
+
+/** An artist or album: cover, name, counts. Tapping plays it in album and track order. */
+@Composable
+private fun GroupRow(group: SongGroup, round: Boolean, onPlay: () -> Unit) {
+    val p = Palette
+    val cover = group.songs.firstOrNull { it.artworkUri != null } ?: group.songs.firstOrNull()
+    Row(
+        Modifier.fillMaxWidth().clip(RadiusMd).clickable(onClickLabel = "Play ${group.title}", onClick = onPlay).padding(horizontal = 8.dp, vertical = 7.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        ArtworkBox(cover?.artworkUri, 50.dp, shape = if (round) CircleShape else RadiusSm, audioUri = cover?.contentUri)
+        Spacer(Modifier.width(14.dp))
+        Column(Modifier.weight(1f)) {
+            Text(group.title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(group.subtitle, color = p.textSecondary, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        NeuIconButton(Icons.Rounded.PlayArrow, "Play ${group.title}", onPlay, size = 38.dp)
+    }
+}
+
+@Composable
+private fun SortMenu(sort: SongSort, onSort: (SongSort) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    Box {
+        Row(
+            Modifier.clip(CircleShape).clickable(onClickLabel = "Change sort order") { open = true }.padding(horizontal = 8.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Eyebrow("Sort")
+            Spacer(Modifier.width(8.dp))
+            Text(sort.label, style = MaterialTheme.typography.labelLarge)
+            Icon(Icons.Rounded.ExpandMore, contentDescription = null, tint = Palette.textMuted)
+        }
+        androidx.compose.material3.DropdownMenu(expanded = open, onDismissRequest = { open = false }, containerColor = Palette.bg) {
+            SongSort.entries.forEach { option ->
+                androidx.compose.material3.DropdownMenuItem(
+                    text = { Text(option.label, color = if (option == sort) Palette.accent else Palette.textPrimary) },
+                    onClick = {
+                        open = false
+                        onSort(option)
+                    },
+                )
+            }
+        }
     }
 }
