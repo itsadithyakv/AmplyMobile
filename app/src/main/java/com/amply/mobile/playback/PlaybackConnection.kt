@@ -37,7 +37,17 @@ class PlaybackConnection(
     private var controller: MediaController? = null
 
     private val _state = MutableStateFlow(AmplyPlaybackState())
+
+    /** Changes on player events only (song, play/pause, queue, modes), never on position ticks. */
     val state: StateFlow<AmplyPlaybackState> = _state
+
+    private val _position = MutableStateFlow(0L)
+
+    /**
+     * Live position, polled while playing and someone is watching. Kept apart from [state] so the
+     * 250 ms tick only recomposes the progress bars that draw it, not the whole app.
+     */
+    val position: StateFlow<Long> = _position
 
     val sleepTimer: StateFlow<SleepTimerState> = SleepTimer.state
 
@@ -46,7 +56,9 @@ class PlaybackConnection(
             val mediaController = connect()
             // Position is not pushed by the player, so poll it, but only while someone is watching.
             while (isActive) {
-                if (mediaController.isPlaying && _state.subscriptionCount.value > 0) refreshState(mediaController)
+                if (mediaController.isPlaying && _position.subscriptionCount.value > 0) {
+                    _position.value = mediaController.currentPosition.coerceAtLeast(0L)
+                }
                 delay(POSITION_POLL_MS)
             }
         }
@@ -159,6 +171,7 @@ class PlaybackConnection(
         val item = player.currentMediaItem
         val external = item?.takeIf { it.mediaId.startsWith(EXTERNAL_MEDIA_PREFIX) }
         val order = playOrder(player)
+        _position.value = player.currentPosition.coerceAtLeast(0L)
         _state.value = AmplyPlaybackState(
             currentSongId = item?.mediaId?.toLongOrNull(),
             isPlaying = player.isPlaying,

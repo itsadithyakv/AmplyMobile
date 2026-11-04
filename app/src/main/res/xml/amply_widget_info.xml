@@ -1,13 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- "Now playing" strip. Resizable; the provider swaps layouts by size (small, medium, cover). -->
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
     android:description="@string/widget_description"
-    android:initialLayout="@layout/widget_amply_player_compact"
-    android:minWidth="220dp"
-    android:minHeight="82dp"
+    android:initialLayout="@layout/widget_player_small"
+    android:previewLayout="@layout/widget_player_small"
     android:previewImage="@drawable/ic_launcher_foreground"
-    android:previewLayout="@layout/widget_amply_player_compact"
-    android:resizeMode="horizontal|vertical"
-    android:targetCellWidth="3"
+    android:minWidth="180dp"
+    android:minHeight="40dp"
+    android:minResizeWidth="180dp"
+    android:minResizeHeight="40dp"
+    android:targetCellWidth="4"
     android:targetCellHeight="1"
+    android:resizeMode="horizontal|vertical"
     android:updatePeriodMillis="0"
     android:widgetCategory="home_screen" />

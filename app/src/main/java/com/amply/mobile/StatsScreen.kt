@@ -1,10 +1,10 @@
 package com.amply.mobile
 
+import com.amply.mobile.util.plural
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -182,7 +182,7 @@ private fun RankedList(title: String, entries: List<RankedEntry>, songsById: Map
                         Text(entry.label, style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold), maxLines = 1, overflow = TextOverflow.Ellipsis)
                         entry.sublabel?.let { Text(it, color = p.textSecondary, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis) }
                     }
-                    Text("${entry.plays} plays", color = p.textSecondary, style = MaterialTheme.typography.bodySmall)
+                    Text(plural(entry.plays, "play"), color = p.textSecondary, style = MaterialTheme.typography.bodySmall)
                 }
             }
         }

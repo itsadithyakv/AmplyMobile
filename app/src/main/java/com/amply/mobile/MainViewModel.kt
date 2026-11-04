@@ -32,6 +32,7 @@ import com.amply.mobile.stats.MIN_ENCORE_PLAYS
 import com.amply.mobile.stats.StatsRange
 import com.amply.mobile.stats.computeEncore
 import com.amply.mobile.stats.computeListeningStats
+import com.amply.mobile.widget.AmplyWidgetProvider
 import com.amply.mobile.worker.MetadataEnrichmentWorker
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -92,6 +93,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     )
 
     val playbackState = playback.state
+
+    /** Live playback position; read it only where it is drawn (see PlaybackConnection.position). */
+    val playbackPosition: StateFlow<Long> = playback.position
 
     // Amply Pro -----------------------------------------------------------------------------
 
@@ -401,6 +405,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _busy.value = true
             val count = runCatching { library.scanLibrary() }.getOrDefault(0)
             playlistsRepository.regenerateSmartPlaylists(library.allSongs())
+            AmplyWidgetProvider.invalidateShortcuts(getApplication())
             _busy.value = false
             _message.value = "Library scanned: $count songs"
         }
@@ -426,6 +431,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun regenerateSmartPlaylists() {
         viewModelScope.launch {
             playlistsRepository.regenerateSmartPlaylists(songs.value)
+            AmplyWidgetProvider.invalidateShortcuts(getApplication())
             _message.value = "Smart playlists refreshed"
         }
     }

@@ -1,7 +1,7 @@
 package com.amply.mobile
 
+import com.amply.mobile.util.plural
 import android.os.SystemClock
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -55,7 +55,6 @@ import com.amply.mobile.domain.Song
 import com.amply.mobile.playback.PlaybackCommands
 import com.amply.mobile.playback.SleepTimerState
 import com.amply.mobile.ui.theme.AmplyMuted
-import com.amply.mobile.ui.theme.AmplyOrange
 import com.amply.mobile.ui.theme.Palette
 import com.amply.mobile.ui.theme.neuPressed
 import androidx.compose.foundation.layout.Box
@@ -189,7 +188,7 @@ fun QueueSheet(
             }
             item {
                 Text(
-                    if (upNext.isEmpty()) "Nothing queued after this song" else "Up next - ${upNext.size} songs",
+                    if (upNext.isEmpty()) "Nothing queued after this song" else "Up next - ${plural(upNext.size, "song")}",
                     color = AmplyMuted,
                     style = MaterialTheme.typography.labelLarge,
                 )

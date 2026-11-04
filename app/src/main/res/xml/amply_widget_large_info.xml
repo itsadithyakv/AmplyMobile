@@ -1,13 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- "Now playing" card. Starts at 4x2; taller sizes switch to the cover-backed layout. -->
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
     android:description="@string/widget_large_description"
-    android:initialLayout="@layout/widget_amply_player"
-    android:minWidth="300dp"
-    android:minHeight="150dp"
+    android:initialLayout="@layout/widget_player_medium"
+    android:previewLayout="@layout/widget_player_medium"
     android:previewImage="@drawable/ic_launcher_foreground"
-    android:previewLayout="@layout/widget_amply_player"
-    android:resizeMode="horizontal|vertical"
+    android:minWidth="250dp"
+    android:minHeight="100dp"
+    android:minResizeWidth="110dp"
+    android:minResizeHeight="40dp"
     android:targetCellWidth="4"
     android:targetCellHeight="2"
+    android:resizeMode="horizontal|vertical"
     android:updatePeriodMillis="0"
     android:widgetCategory="home_screen" />

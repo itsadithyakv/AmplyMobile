@@ -1,5 +1,6 @@
 package com.amply.mobile
 
+import com.amply.mobile.util.plural
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -37,6 +38,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -68,6 +70,8 @@ import com.amply.mobile.ui.theme.Palette
 import com.amply.mobile.ui.theme.neuAccent
 import com.amply.mobile.ui.theme.neuPressed
 import com.amply.mobile.ui.theme.neuRaised
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.flow.StateFlow
 
 // Radii follow the desktop's four-step scale (--radius-sm/md/lg and full).
 val RadiusSm = RoundedCornerShape(10.dp)
@@ -79,7 +83,8 @@ val RadiusLg = RoundedCornerShape(24.dp)
 fun MiniPlayer(
     song: Song,
     isPlaying: Boolean,
-    progress: Float,
+    durationMs: Long,
+    position: StateFlow<Long>,
     onOpen: () -> Unit,
     onPlayPause: () -> Unit,
     onNext: () -> Unit,
@@ -116,17 +121,26 @@ fun MiniPlayer(
             Spacer(Modifier.width(4.dp))
             NeuIconButton(Icons.Rounded.SkipNext, "Next song", onNext, size = 40.dp, flat = true)
         }
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp)
-                .height(3.dp)
-                .clip(CircleShape)
-                .background(p.textMuted.copy(alpha = 0.18f)),
-        ) {
-            Box(Modifier.fillMaxWidth(progress.coerceIn(0f, 1f)).fillMaxHeight().background(p.accent))
-        }
+        MiniProgressLine(position, durationMs)
         Spacer(Modifier.height(6.dp))
+    }
+}
+
+/** The only part of the player bar that reads the live position, so only it redraws each tick. */
+@Composable
+private fun MiniProgressLine(position: StateFlow<Long>, durationMs: Long) {
+    val p = Palette
+    val positionMs by position.collectAsStateWithLifecycle()
+    val fraction = if (durationMs > 0L) (positionMs.toFloat() / durationMs).coerceIn(0f, 1f) else 0f
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+            .height(3.dp)
+            .clip(CircleShape)
+            .background(p.textMuted.copy(alpha = 0.18f)),
+    ) {
+        Box(Modifier.fillMaxWidth(fraction).fillMaxHeight().background(p.accent))
     }
 }
 
@@ -198,7 +212,7 @@ fun PlaylistListRow(playlist: Playlist, onClick: () -> Unit, onPlay: () -> Unit,
         Spacer(Modifier.width(14.dp))
         Column(Modifier.weight(1f)) {
             Text(playlist.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text("${playlist.songIds.size} songs", color = p.textSecondary, style = MaterialTheme.typography.bodySmall)
+            Text(plural(playlist.songIds.size, "song"), color = p.textSecondary, style = MaterialTheme.typography.bodySmall)
         }
         NeuIconButton(Icons.Rounded.PlayArrow, "Play ${playlist.name}", onPlay, size = 38.dp)
     }
@@ -219,7 +233,7 @@ fun GenreRow(genre: String, count: Int, onClick: () -> Unit) {
         Icon(Icons.Rounded.MusicNote, contentDescription = null, tint = p.accent)
         Spacer(Modifier.width(14.dp))
         Text(genre, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-        Text("$count songs", color = p.textSecondary, style = MaterialTheme.typography.bodySmall)
+        Text(plural(count, "song"), color = p.textSecondary, style = MaterialTheme.typography.bodySmall)
     }
 }
 
@@ -353,6 +367,8 @@ fun NeuIconButton(
     }
     Box(
         modifier = Modifier
+            // Small row icons still get a 48 dp touch target (Material and Android guidance).
+            .minimumInteractiveComponentSize()
             .size(size)
             .then(surface)
             .clip(CircleShape)

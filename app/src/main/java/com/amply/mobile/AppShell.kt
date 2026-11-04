@@ -15,7 +15,6 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -34,9 +33,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.BarChart
 import com.amply.mobile.playlist.RulePlaylist
 import com.amply.mobile.pro.ProFeature
@@ -44,8 +41,6 @@ import com.amply.mobile.pro.isProMix
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.LibraryMusic
 import androidx.compose.material.icons.rounded.Search
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -63,9 +58,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
@@ -75,10 +68,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.amply.mobile.domain.Playlist
 import com.amply.mobile.domain.PlaylistType
 import com.amply.mobile.domain.Song
-import com.amply.mobile.ui.theme.AmplyBg
-import com.amply.mobile.ui.theme.AmplyGlass
 import com.amply.mobile.ui.theme.AmplyMuted
-import com.amply.mobile.ui.theme.AmplyOrange
 import com.amply.mobile.ui.theme.NeuDepth
 import com.amply.mobile.ui.theme.Palette
 import com.amply.mobile.ui.theme.neuPressed
@@ -221,17 +211,17 @@ fun AmplyApp(viewModel: MainViewModel) {
         }
     }
 
-    val progress = if (playback.durationMs > 0L) playback.positionMs.toFloat() / playback.durationMs else 0f
-
     Scaffold(
         containerColor = Color.Transparent,
         snackbarHost = { SnackbarHost(snackbarHostState) },
         bottomBar = {
+            // Now Playing is a full-screen player; the bar would only repeat its controls.
+            if (selectedTab == AppTab.NowPlaying && selectedPlaylistId == null) return@Scaffold
             // The desktop player bar: one raised slab holding the now-playing strip and the tabs.
             Column(
                 Modifier
                     .navigationBarsPadding()
-                    .padding(horizontal = 14.dp, vertical = 10.dp)
+                    .padding(horizontal = 12.dp, vertical = 8.dp)
                     .neuRaised(RadiusLg, NeuDepth.Raised)
                     .clip(RadiusLg)
                     .animateContentSize(animationSpec = tween(320)),
@@ -245,7 +235,8 @@ fun AmplyApp(viewModel: MainViewModel) {
                         MiniPlayer(
                             song = it,
                             isPlaying = playback.isPlaying,
-                            progress = progress,
+                            durationMs = playback.durationMs,
+                            position = viewModel.playbackPosition,
                             onOpen = { viewModel.open(AppTab.NowPlaying) },
                             onPlayPause = viewModel::togglePlayPause,
                             onNext = viewModel::next,
@@ -258,7 +249,9 @@ fun AmplyApp(viewModel: MainViewModel) {
         },
     ) { padding ->
         AmplyBackground {
-            Box(Modifier.fillMaxSize().padding(padding)) {
+            // Now Playing draws its blurred cover up to the top edge and pads its own content.
+            val fullBleed = selectedTab == AppTab.NowPlaying && selectedPlaylistId == null
+            Box(Modifier.fillMaxSize().then(if (fullBleed) Modifier else Modifier.padding(padding))) {
                 val playlistId = selectedPlaylistId
                 if (playlistId != null) {
                     val playlist = playlists.firstOrNull { it.id == playlistId }
@@ -325,7 +318,8 @@ fun AmplyApp(viewModel: MainViewModel) {
                             )
                             AppTab.NowPlaying -> NowPlayingScreen(
                                 song = currentSong,
-                                playback = playback,
+                                playbackState = playback,
+                                position = viewModel.playbackPosition,
                                 lyrics = lyrics,
                                 busy = busy,
                                 upNext = upNext,
@@ -484,7 +478,7 @@ fun GlassBottomNav(selectedTab: AppTab, onSelect: (AppTab) -> Unit) {
                     .then(if (selected) Modifier.neuPressed(RadiusMd) else Modifier)
                     .clip(RadiusMd)
                     .clickable(onClickLabel = item.label) { onSelect(item.tab) }
-                    .padding(vertical = 8.dp),
+                    .padding(vertical = 6.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Icon(item.icon, contentDescription = null, tint = fg, modifier = Modifier.size(22.dp))
